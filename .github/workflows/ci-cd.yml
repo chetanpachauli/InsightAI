@@ -1,0 +1,86 @@
+name: InsightAI CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  # Job 1: Test & Lint Backend (FastAPI)
+  backend-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run Backend Tests
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///:memory: # In-memory SQLite for testing
+          JWT_SECRET_KEY: test_secret_key_for_ci_pipeline_only
+        run: |
+          # Pytest execution
+          cd backend
+          python -m pytest
+
+  # Job 2: Test & Build Frontend (Next.js)
+  frontend-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Compile & Build Next.js
+        run: |
+          cd frontend
+          npm run build
+
+  # Job 3: Build & Dockerize (CD Pipeline)
+  docker-cd:
+    needs: [backend-ci, frontend-ci]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: actions/setup-buildx-action@v3
+
+      # (Optional) Log in to Docker Hub if secrets are configured
+      # - name: Log in to Docker Hub
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Backend Docker Image (Test Compilation)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false # Set true and provide tags to upload to Docker Hub in production
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/insightai-backend:latest

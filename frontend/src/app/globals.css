@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+:root {
+  --background: #020617; /* slate-950 */
+  --foreground: #f1f5f9; /* slate-100 */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
+
+@media print {
+  /* Hide sidebar and buttons when printing to PDF */
+  aside, .no-print {
+    display: none !important;
+  }
+  
+  /* Reset body and main view for print */
+  body, main {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  
+  /* Convert dark cards to light print-friendly boxes */
+  .bg-slate-900\/60, .bg-slate-900, .bg-slate-950\/40, .bg-slate-950, .bg-slate-850 {
+    background: #f8fafc !important; /* slate-50 */
+    border-color: #cbd5e1 !important; /* slate-300 */
+    color: #0f172a !important; /* slate-900 */
+    box-shadow: none !important;
+  }
+  
+  /* Ensure all text labels print clearly in black */
+  h1, h2, h3, h4, span, p, li, td, th {
+    color: #000000 !important;
+  }
+}

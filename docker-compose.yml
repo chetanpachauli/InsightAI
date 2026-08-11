@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Database Service
+  db:
+    image: postgres:15-alpine
+    container_name: insightai_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-insightai}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. Redis Caching & Queue Broker Service
+  redis:
+    image: redis:7-alpine
+    container_name: insightai_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # 3. FastAPI Python Backend Service
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: insightai_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-insightai}
+      - REDIS_URL=redis://redis:6379/0
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+    volumes:
+      - ./backend:/workspace
+      - ./uploads:/workspace/uploads
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  postgres_data:

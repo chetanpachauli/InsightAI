@@ -1,0 +1,299 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Sidebar from "@/components/Sidebar";
+import api from "@/lib/api";
+import { 
+  TrendingUp, 
+  FileText, 
+  CheckCircle2, 
+  Sliders, 
+  Bot, 
+  Activity, 
+  AlertCircle, 
+  Loader2, 
+  Sparkles,
+  Printer 
+} from "lucide-react";
+
+interface AuditLog {
+  id: number;
+  action: string;
+  details: string;
+  timestamp: string;
+}
+
+interface DashboardStats {
+  total_files: number;
+  total_approved: number;
+  total_rules: number;
+  recent_logs: AuditLog[];
+}
+
+interface AIInsights {
+  key_findings: string[];
+  recommendations: string[];
+}
+
+export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [insights, setInsights] = useState<AIInsights | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const userEmail = typeof window !== "undefined" ? localStorage.getItem("user_email") : "";
+  const userRole = typeof window !== "undefined" ? localStorage.getItem("user_role") : "";
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      
+      // Concurrently fetch stats and AI insights
+      const [statsRes, insightsRes] = await Promise.all([
+        api.get("/query/stats"),
+        api.get("/query/insights")
+      ]);
+      
+      setStats(statsRes.data);
+      setInsights(insightsRes.data);
+    } catch (err: any) {
+      setError("Failed to fetch dashboard metrics. Please ensure the databases and backend server are running.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex">
+      <Sidebar />
+
+      <main className="flex-1 p-8 overflow-y-auto">
+        {/* Top welcome profile bar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-slate-900">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+              MIS Executive Dashboard
+            </h1>
+            <p className="text-slate-500 text-sm mt-1">
+              Real-time monitoring of uploads, workflow approvals, and AI data diagnostics.
+            </p>
+          </div>
+          <div className="mt-4 md:mt-0 flex items-center space-x-3 no-print">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-md transition-all cursor-pointer"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Export PDF Report</span>
+            </button>
+            <div className="flex items-center space-x-3 bg-slate-900/50 border border-slate-800/80 px-4 py-3 rounded-2xl">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-semibold text-slate-300">
+                Welcome, <span className="text-indigo-400 font-bold">{userEmail?.split("@")[0] || "User"}</span> ({userRole})
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Global Error Banner */}
+        {error && (
+          <div className="p-4 bg-red-950/40 border border-red-900/50 rounded-2xl text-xs text-red-400 font-medium mb-8 flex items-center space-x-2">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-40">
+            <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
+            <p className="text-slate-400 text-sm">Assembling analytics workspace...</p>
+            <p className="text-slate-500 text-xs mt-1">Running database aggregations & Gemini AI reports</p>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            
+            {/* 1. KPI Cards Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Card 1: Total Files */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 hover:border-slate-700/80 transition-all duration-200 shadow-lg relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl group-hover:bg-indigo-500/10 transition-colors" />
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Spreadsheets Loaded
+                  </span>
+                  <div className="w-10 h-10 rounded-xl bg-slate-850 border border-slate-800 flex items-center justify-center text-indigo-400">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-extrabold text-white">
+                  {stats?.total_files || 0}
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-2 font-medium">
+                  Total file versions in registry
+                </p>
+              </div>
+
+              {/* Card 2: Approved Tables */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 hover:border-slate-700/80 transition-all duration-200 shadow-lg relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-colors" />
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Approved Datasets
+                  </span>
+                  <div className="w-10 h-10 rounded-xl bg-slate-850 border border-slate-800 flex items-center justify-center text-emerald-400">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-extrabold text-white">
+                  {stats?.total_approved || 0}
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-2 font-medium">
+                  Tables available in AI Chat & Queries
+                </p>
+              </div>
+
+              {/* Card 3: Alert Rules */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 hover:border-slate-700/80 transition-all duration-200 shadow-lg relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/5 rounded-full blur-xl group-hover:bg-violet-500/10 transition-colors" />
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Rules Engine Triggers
+                  </span>
+                  <div className="w-10 h-10 rounded-xl bg-slate-850 border border-slate-800 flex items-center justify-center text-violet-400">
+                    <Sliders className="w-5 h-5" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-extrabold text-white">
+                  {stats?.total_rules || 0}
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-2 font-medium">
+                  Active alert validation rules
+                </p>
+              </div>
+            </div>
+
+            {/* 2. Main Body Grid: AI Insights (2/3) + Activity Trail (1/3) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              
+              {/* Left Side: AI Reports and Insights */}
+              <div className="lg:col-span-2 space-y-6">
+                <div className="bg-gradient-to-br from-slate-900/80 to-slate-950/80 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-xl relative overflow-hidden shadow-xl">
+                  {/* Decorative AI Glow */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+                  
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-bold text-slate-200 flex items-center space-x-2">
+                      <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
+                      <span>Gemini Business Intelligence Insights</span>
+                    </h2>
+                    <span className="text-[9px] uppercase font-bold text-slate-500 tracking-widest border border-slate-800/80 px-2 py-0.5 rounded">
+                      Report Builder
+                    </span>
+                  </div>
+
+                  {insights ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      
+                      {/* Key Findings column */}
+                      <div className="space-y-4">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/50 pb-2">
+                          Key Diagnostics
+                        </h4>
+                        <ul className="space-y-3">
+                          {insights.key_findings.map((item, idx) => (
+                            <li key={idx} className="text-sm text-slate-300 flex items-start space-x-2.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0 mt-1.5" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* AI recommendations column */}
+                      <div className="space-y-4">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/50 pb-2">
+                          Action Recommendations
+                        </h4>
+                        <ul className="space-y-3">
+                          {insights.recommendations.map((item, idx) => (
+                            <li key={idx} className="text-sm text-slate-300 flex items-start space-x-2.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0 mt-1.5" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 border border-dashed border-slate-850 rounded-2xl">
+                      <Bot className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+                      <p className="text-slate-400 text-xs font-semibold">No insights generated</p>
+                      <p className="text-slate-500 text-[10px] mt-0.5">Please approve files to let Gemini compile metrics.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Side: Activity/Audit Logs Trail */}
+              <div className="lg:col-span-1">
+                <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl h-full flex flex-col">
+                  <h2 className="text-base font-bold text-slate-200 mb-6 flex items-center space-x-2 border-b border-slate-850 pb-4">
+                    <Activity className="w-5 h-5 text-indigo-400" />
+                    <span>Real-time System Audit Logs</span>
+                  </h2>
+
+                  {stats && stats.recent_logs.length > 0 ? (
+                    <div className="flex-1 space-y-4">
+                      {stats.recent_logs.map((log) => {
+                        // Colored badges for different actions
+                        const isUpload = log.action.includes("UPLOAD");
+                        const isApprove = log.action.includes("APPROVE");
+                        const isQuery = log.action.includes("QUERY");
+
+                        return (
+                          <div key={log.id} className="p-3 bg-slate-950/40 border border-slate-850/80 rounded-2xl text-xs space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className={`inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                                isUpload 
+                                  ? "bg-blue-950/40 text-blue-400 border border-blue-900/30"
+                                  : isApprove
+                                  ? "bg-emerald-950/40 text-emerald-400 border border-emerald-900/30"
+                                  : isQuery
+                                  ? "bg-purple-950/40 text-purple-400 border border-purple-900/30"
+                                  : "bg-slate-900 text-slate-400"
+                              }`}>
+                                {log.action}
+                              </span>
+                              <span className="text-[9px] text-slate-500">
+                                {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="text-slate-300 font-medium leading-relaxed">{log.details}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-center border border-dashed border-slate-850 rounded-2xl">
+                      <Activity className="w-8 h-8 text-slate-700 mb-2" />
+                      <p className="text-slate-400 text-xs font-semibold">No recent logs</p>
+                      <p className="text-slate-500 text-[10px] mt-0.5">Actions will stream here live.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

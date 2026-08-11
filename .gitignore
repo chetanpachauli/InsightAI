@@ -1,0 +1,36 @@
+# Secrets & Keys
+.env
+*.env
+secrets.json
+
+# Dependencies & Build Folders
+node_modules/
+.next/
+dist/
+build/
+bin/
+obj/
+
+# Python caching & environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Local Databases & Uploaded user files
+db_data/
+uploads/*
+!uploads/.gitkeep
+
+# System & OS Files
+.DS_Store
+Thumbs.db
+*.log
+.system_generated/
+.gemini/
