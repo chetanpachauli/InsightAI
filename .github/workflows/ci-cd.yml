@@ -27,7 +27,7 @@ jobs:
 
       - name: Run Backend Tests
         env:
-          DATABASE_URL: sqlite+aiosqlite:///:memory: # In-memory SQLite for testing
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
           JWT_SECRET_KEY: test_secret_key_for_ci_pipeline_only
         run: |
           # Pytest execution
