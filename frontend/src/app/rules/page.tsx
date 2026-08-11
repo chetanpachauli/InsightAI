@@ -250,6 +250,10 @@ export default function RulesPage() {
                     </div>
                   </div>
 
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Action Trigger
+                    </label>
                     <select
                       value={action}
                       onChange={(e) => setAction(e.target.value)}
