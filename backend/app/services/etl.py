@@ -100,9 +100,11 @@ class ETLService:
         clean_filename_slug = re.sub(r'[^a-z0-9]', '_', file_record.filename.lower().split('.')[0])
         dynamic_table_name = f"data_{clean_filename_slug}_v{file_record.version}"
 
-        # Drop table if exists, then create it
+        # Execute table dropping first
+        drop_table_sql = f"DROP TABLE IF EXISTS {dynamic_table_name};"
+        
+        # Then execute table creation
         create_table_sql = f"""
-        DROP TABLE IF EXISTS {dynamic_table_name};
         CREATE TABLE {dynamic_table_name} (
             _row_id SERIAL PRIMARY KEY,
             _source_file_id INTEGER DEFAULT {file_id},
@@ -111,7 +113,8 @@ class ETLService:
         """
 
         try:
-            # Execute table creation
+            # Execute both statements sequentially
+            await db.execute(text(drop_table_sql))
             await db.execute(text(create_table_sql))
             
             # 5. Bulk Insert Data
@@ -174,13 +177,20 @@ class ETLService:
             }
 
         except Exception as e:
-            # Rollback and mark as FAILED
+            # Rollback and print original traceback first
+            import traceback
+            print("--- ETL PROCESS INITIAL EXCEPTION TRACEBACK ---")
+            traceback.print_exc()
+            print("-----------------------------------------------")
+            
             await db.rollback()
             file_record.status = "FAILED"
             
-            lineage = file_record.lineage_info or {}
+            # Use db.get again to prevent greenlet expiration issues
+            refreshed_record = await db.get(UploadedFile, file_id)
+            lineage = refreshed_record.lineage_info or {}
             lineage["processing_error"] = str(e)
-            file_record.lineage_info = lineage
+            refreshed_record.lineage_info = lineage
             
             audit = AuditLog(
                 user_id=file_record.owner_id,
