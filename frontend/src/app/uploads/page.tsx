@@ -45,6 +45,12 @@ export default function UploadsPage() {
   const [lineageTrail, setLineageTrail] = useState<LineageLog[]>([]);
   const [loadingLineage, setLoadingLineage] = useState(false);
 
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const userRole = typeof window !== "undefined" ? localStorage.getItem("user_role") : "";
 
   const fetchFiles = async () => {
@@ -161,7 +167,7 @@ export default function UploadsPage() {
                 Only CSV, XLSX, or XLS formats. File versions will be auto-managed on collision.
               </p>
 
-              {userRole !== "MIS" && userRole !== "Admin" ? (
+              {!mounted || (userRole !== "MIS" && userRole !== "Admin") ? (
                 <div className="p-4 bg-amber-950/20 border border-amber-900/40 rounded-2xl flex items-start space-x-3 text-amber-500 text-xs">
                   <ShieldAlert className="w-5 h-5 flex-shrink-0 mt-0.5" />
                   <p>
