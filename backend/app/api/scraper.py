@@ -106,7 +106,7 @@ async def extract_website_data(
     else:
         try:
             response = gemini_service.client.models.generate_content(
-                model='gemini-1.5-flash',
+                model='gemini-2.5-flash',
                 contents=prompt
             )
             # Remove any wrapping codeblock markup from Gemini if present
