@@ -2,16 +2,13 @@
 
 import { useState, useRef, useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
-import api from "@/lib/api";
+import api, { getApiError } from "@/lib/api";
 import { 
   Send, 
   Bot, 
   User, 
   Loader2, 
   Terminal, 
-  BarChart4, 
-  PieChart as PieIcon, 
-  LineChart as LineIcon, 
   Table 
 } from "lucide-react";
 import {
@@ -35,7 +32,7 @@ interface Message {
   sender: "user" | "bot";
   text: string;
   sql?: string;
-  data?: any[];
+  data?: Record<string, unknown>[];
   chartConfig?: {
     chart_type: string;
     x_axis: string;
@@ -99,8 +96,8 @@ export default function ChatPage() {
           chartConfig: response.data.chart_config
         }
       ]);
-    } catch (err: any) {
-      const errMsg = err.response?.data?.detail || "Error connecting to AI query engine. Please check database logs.";
+    } catch (err) {
+      const errMsg = getApiError(err, "Error connecting to AI query engine. Please check database logs.");
       setMessages((prev) => [
         ...prev,
         {
@@ -119,7 +116,7 @@ export default function ChatPage() {
   };
 
   // Helper to render Recharts dynamically
-  const renderChart = (data: any[], config: any) => {
+  const renderChart = (data: Record<string, unknown>[], config: Message["chartConfig"]) => {
     if (!data || data.length === 0 || !config || config.chart_type === "none" || config.chart_type === "table") {
       return null;
     }
@@ -130,14 +127,14 @@ export default function ChatPage() {
     // Format clean labels and keys
     // Sometimes SQL names are like "sum(amount)" or "SUM(amount)"
     // We search the data object keys to match ignoring casing
-    const dataKeys = Object.keys(data[0]);
+    const dataKeys = Object.keys(data[0] || {});
     const xKey = dataKeys.find((k) => k.toLowerCase() === x_axis.toLowerCase()) || x_axis;
     const yKey = dataKeys.find((k) => k.toLowerCase() === y_axis.toLowerCase()) || y_axis;
 
     // Convert string numeric values to actual numbers for Recharts plotting
     const chartData = data.map((item) => ({
       ...item,
-      [yKey]: typeof item[yKey] === "string" ? parseFloat(item[yKey]) : item[yKey],
+      [yKey]: typeof item[yKey] === "string" ? parseFloat(item[yKey] as string) : item[yKey],
     }));
 
     return (
@@ -208,7 +205,7 @@ export default function ChatPage() {
             <h2 className="text-base font-bold text-slate-100">AI SQL Analytics Chat</h2>
             <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider flex items-center">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-ping" />
-              Gemini-1.5-Flash Active
+              Gemini-3.5-Flash Active
             </span>
           </div>
         </div>
@@ -278,7 +275,7 @@ export default function ChatPage() {
                             <table className="w-full text-left">
                               <thead>
                                 <tr className="border-b border-slate-800 text-slate-500 font-bold uppercase">
-                                  {Object.keys(msg.data[0]).map((key) => (
+                                  {Object.keys(msg.data[0] || {}).map((key) => (
                                     <th key={key} className="pb-2 pr-4">{key}</th>
                                   ))}
                                 </tr>
@@ -286,9 +283,9 @@ export default function ChatPage() {
                               <tbody className="divide-y divide-slate-800/40 text-slate-300">
                                 {msg.data.slice(0, 10).map((row, idx) => (
                                   <tr key={idx}>
-                                    {Object.values(row).map((val: any, vIdx) => (
+                                    {Object.values(row).map((val, vIdx) => (
                                       <td key={vIdx} className="py-2 pr-4 font-mono">
-                                        {val === null ? "NULL" : String(val)}
+                                        {val === null || val === undefined ? "NULL" : String(val)}
                                       </td>
                                     ))}
                                   </tr>

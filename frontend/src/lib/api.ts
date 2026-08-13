@@ -1,4 +1,5 @@
 import axios from "axios";
+import { useSyncExternalStore } from "react";
 
 const API_BASE_URL = "http://localhost:8000/api";
 
@@ -49,7 +50,7 @@ api.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           return api(originalRequest);
         }
-      } catch (refreshError) {
+      } catch {
         // If refresh fails, clear token and redirect to login
         if (typeof window !== "undefined") {
           localStorage.removeItem("access_token");
@@ -62,5 +63,24 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export function getApiError(err: unknown, fallback: string): string {
+  if (err && typeof err === "object" && "response" in err) {
+    const detail = (err as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
+    if (typeof detail === "string" && detail) return detail;
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
+const subscribeNoop = () => () => {};
+
+export function useLocalStorage(key: string): string {
+  return useSyncExternalStore(
+    subscribeNoop,
+    () => localStorage.getItem(key) ?? "",
+    () => ""
+  );
+}
 
 export default api;

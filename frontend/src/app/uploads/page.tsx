@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
-import api from "@/lib/api";
+import api, { getApiError, useLocalStorage } from "@/lib/api";
 import { 
   UploadCloud, 
   FileText, 
   CheckCircle, 
   XCircle, 
   Loader2, 
-  Eye, 
   CheckSquare, 
   Activity, 
   ShieldAlert, 
@@ -33,6 +32,11 @@ interface LineageLog {
   timestamp: string;
 }
 
+interface LineageFileDetails {
+  filename: string;
+  version: number;
+}
+
 export default function UploadsPage() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -41,24 +45,17 @@ export default function UploadsPage() {
   const [success, setSuccess] = useState("");
 
   // Lineage modal state
-  const [selectedLineageFile, setSelectedLineageFile] = useState<any>(null);
+  const [selectedLineageFile, setSelectedLineageFile] = useState<LineageFileDetails | null>(null);
   const [lineageTrail, setLineageTrail] = useState<LineageLog[]>([]);
   const [loadingLineage, setLoadingLineage] = useState(false);
 
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const userRole = typeof window !== "undefined" ? localStorage.getItem("user_role") : "";
+  const userRole = useLocalStorage("user_role");
 
   const fetchFiles = async () => {
     try {
-      setLoading(true);
       const response = await api.get("/files");
       setFiles(response.data);
-    } catch (e: any) {
+    } catch {
       setError("Failed to fetch files. Is the backend running?");
     } finally {
       setLoading(false);
@@ -66,6 +63,7 @@ export default function UploadsPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchFiles();
   }, []);
 
@@ -88,8 +86,8 @@ export default function UploadsPage() {
       });
       setSuccess(`File "${response.data.filename}" (v${response.data.version}) uploaded successfully! Processing started.`);
       fetchFiles();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Upload failed. Please ensure file type is valid (.csv/.xlsx).");
+    } catch (err) {
+      setError(getApiError(err, "Upload failed. Please ensure file type is valid (.csv/.xlsx)."));
     } finally {
       setUploading(false);
     }
@@ -102,8 +100,8 @@ export default function UploadsPage() {
       const response = await api.post(`/files/${fileId}/approve`);
       setSuccess(`File updated successfully! State is now: ${response.data.workflow_status}`);
       fetchFiles();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Approval action failed.");
+    } catch (err) {
+      setError(getApiError(err, "Approval action failed."));
     }
   };
 
@@ -114,7 +112,7 @@ export default function UploadsPage() {
       const response = await api.get(`/files/${fileId}/lineage`);
       setSelectedLineageFile(response.data.file_details);
       setLineageTrail(response.data.audit_trail);
-    } catch (e: any) {
+    } catch {
       setError("Failed to fetch data lineage details.");
     } finally {
       setLoadingLineage(false);
@@ -137,7 +135,7 @@ export default function UploadsPage() {
             </p>
           </div>
           <button 
-            onClick={fetchFiles}
+            onClick={() => { setLoading(true); fetchFiles(); }}
             className="flex items-center space-x-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
           >
             <RefreshCw className="w-4 h-4" />
@@ -167,7 +165,7 @@ export default function UploadsPage() {
                 Only CSV, XLSX, or XLS formats. File versions will be auto-managed on collision.
               </p>
 
-              {!mounted || (userRole !== "MIS" && userRole !== "Admin") ? (
+              {userRole !== "MIS" && userRole !== "Admin" ? (
                 <div className="p-4 bg-amber-950/20 border border-amber-900/40 rounded-2xl flex items-start space-x-3 text-amber-500 text-xs">
                   <ShieldAlert className="w-5 h-5 flex-shrink-0 mt-0.5" />
                   <p>

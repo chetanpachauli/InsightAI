@@ -1,16 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import text
+from sqlalchemy import text, func
 from app.core.database import get_db
 from app.api.deps import get_current_user
 from app.models.users import User
 from app.models.files import UploadedFile
 from app.models.audit_logs import AuditLog
+from app.models.rules import AlertRule
 from app.services.gemini_service import gemini_service
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import json
+import re
 
 router = APIRouter(prefix="/query", tags=["AI Analytics & Querying"])
 
@@ -51,8 +53,25 @@ async def chat_with_data(
         table_name = lineage.get("db_table")
         columns = lineage.get("columns_mapped", [])
         
+        # Fallback for older records where ETL lineage wasn't persisted:
+        # derive the dynamic table name from the filename + version convention.
         if not table_name:
-            continue
+            clean_slug = re.sub(r"[^a-z0-9]", "_", file.filename.lower().split(".")[0])
+            table_name = f"data_{clean_slug}_v{file.version}"
+        
+        if not columns:
+            try:
+                cols_result = await db.execute(text(
+                    "SELECT column_name, data_type FROM information_schema.columns "
+                    "WHERE table_name = :t ORDER BY ordinal_position"
+                ), {"t": table_name})
+                columns = [
+                    {"cleaned": c["column_name"], "type": c["data_type"]}
+                    for c in cols_result.mappings()
+                    if not c["column_name"].startswith("_")
+                ]
+            except Exception:
+                columns = []
             
         col_desc = []
         for col in columns:
@@ -159,12 +178,35 @@ async def get_executive_insights(
         metrics = lineage.get("metrics", {})
         table_name = lineage.get("db_table")
         
+        # Fallback for older records where ETL lineage wasn't persisted:
+        # derive the dynamic table name and read live row/column counts.
+        if not table_name:
+            clean_slug = re.sub(r"[^a-z0-9]", "_", file.filename.lower().split(".")[0])
+            table_name = f"data_{clean_slug}_v{file.version}"
+        
+        rows_count = metrics.get("total_rows", 0)
+        cols_count = metrics.get("total_columns", 0)
+        if not metrics:
+            try:
+                cols_result = await db.execute(text(
+                    "SELECT COUNT(*) AS total FROM information_schema.columns "
+                    "WHERE table_name = :t AND column_name NOT LIKE '\\_%'"
+                ), {"t": table_name})
+                cols_count = cols_result.scalar() or 0
+                
+                row_result = await db.execute(text(
+                    f"SELECT COUNT(*) FROM {table_name}"
+                ))
+                rows_count = row_result.scalar() or 0
+            except Exception:
+                pass
+        
         summary_metrics.append({
             "filename": file.filename,
             "version": file.version,
             "table_name": table_name,
-            "rows": metrics.get("total_rows", 0),
-            "columns": metrics.get("total_columns", 0),
+            "rows": rows_count,
+            "columns": cols_count,
             "duplicate_rows": metrics.get("duplicate_rows_detected", 0),
             "missing_cells": metrics.get("missing_cells_detected", 0)
         })
@@ -174,9 +216,6 @@ async def get_executive_insights(
     ai_insights = gemini_service.generate_insights(metrics_json_str)
     
     return ai_insights
-
-from sqlalchemy import func
-from app.models.rules import AlertRule
 
 @router.get("/stats")
 async def get_dashboard_stats(
@@ -224,7 +263,4 @@ async def get_dashboard_stats(
             for log in recent_logs
         ]
     }
-
-# Import regular expression library for security filtering
-import re
 

@@ -11,7 +11,13 @@ interface FileItem {
   version: number;
   status: string;
   workflow_status: string;
-  lineage_info?: any;
+  lineage_info?: { db_table?: string };
+}
+
+interface PivotRow {
+  rowLabel: string;
+  rowTotal: number;
+  [key: string]: string | number;
 }
 
 export default function PivotPage() {
@@ -23,7 +29,7 @@ export default function PivotPage() {
   
   // Table schema & data
   const [columns, setColumns] = useState<string[]>([]);
-  const [rawData, setRawData] = useState<any[]>([]);
+  const [rawData, setRawData] = useState<Record<string, unknown>[]>([]);
 
   // Pivot Configuration State
   const [rowField, setRowField] = useState<string>("");
@@ -33,7 +39,7 @@ export default function PivotPage() {
 
   // Output Pivot Data
   const [pivotHeaders, setPivotHeaders] = useState<string[]>([]);
-  const [pivotRows, setPivotRows] = useState<any[]>([]);
+  const [pivotRows, setPivotRows] = useState<PivotRow[]>([]);
   const [grandTotal, setGrandTotal] = useState<number>(0);
   const [columnTotals, setColumnTotals] = useState<Record<string, number>>({});
 
@@ -46,7 +52,7 @@ export default function PivotPage() {
           (f: FileItem) => f.status === "COMPLETED" && f.workflow_status === "APPROVED"
         );
         setFiles(approved);
-      } catch (e) {
+      } catch {
         setError("Failed to fetch tables registry.");
       } finally {
         setLoading(false);
@@ -94,7 +100,7 @@ export default function PivotPage() {
       } else {
         setError("No data records found in this table.");
       }
-    } catch (e) {
+    } catch {
       setError("Failed to retrieve dataset records.");
     } finally {
       setFetchingData(false);
@@ -118,7 +124,7 @@ export default function PivotPage() {
 
     setPivotHeaders(uniqueCols);
 
-    const calculatedRows: any[] = [];
+    const calculatedRows: PivotRow[] = [];
     const colSumAccumulator: Record<string, number> = {};
     let totalAccumulator = 0;
 
@@ -127,7 +133,7 @@ export default function PivotPage() {
 
     // 3. Aggregate data points
     uniqueRows.forEach((rowVal) => {
-      const rowItem: any = { rowLabel: rowVal, rowTotal: 0 };
+      const rowItem: PivotRow = { rowLabel: rowVal, rowTotal: 0 };
       
       uniqueCols.forEach((colVal) => {
         // Filter raw data matching current Row and Column values
@@ -142,7 +148,7 @@ export default function PivotPage() {
         // Parse numerical value
         const values = matchingRecords.map(item => {
           const val = item[valueField];
-          return typeof val === "number" ? val : parseFloat(val) || 0;
+          return typeof val === "number" ? val : parseFloat(String(val)) || 0;
         });
 
         // Compute Aggregation (SUM, AVG, COUNT)

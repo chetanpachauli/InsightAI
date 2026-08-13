@@ -225,6 +225,33 @@ async def get_statement_stats(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied. You do not own this statement table."
         )
+    
+    # Additional SQL injection protection: validate table name format
+    # Only allow alphanumeric characters and underscores
+    if not re.match(r'^[a-zA-Z0-9_]+$', table_name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid table name format. Only alphanumeric characters and underscores are allowed."
+        )
+    
+    # Verify table exists before querying
+    try:
+        table_check = await db.execute(text(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = :tbl)"
+        ), {"tbl": table_name})
+        table_exists = table_check.scalar()
+        if not table_exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Table '{table_name}' does not exist."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error verifying table existence: {str(e)}"
+        )
 
     try:
         # 1. Total debits and credits
@@ -286,6 +313,32 @@ async def override_category(
          raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied. You do not own this statement table."
+        )
+    
+    # Additional SQL injection protection: validate table name format
+    if not re.match(r'^[a-zA-Z0-9_]+$', req.table_name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid table name format. Only alphanumeric characters and underscores are allowed."
+        )
+    
+    # Verify table exists before updating
+    try:
+        table_check = await db.execute(text(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = :tbl)"
+        ), {"tbl": req.table_name})
+        table_exists = table_check.scalar()
+        if not table_exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Table '{req.table_name}' does not exist."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error verifying table existence: {str(e)}"
         )
 
     try:

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { TrendingUp, Mail, Lock, Shield, ArrowRight } from "lucide-react";
 import axios from "axios";
+import { getApiError } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -51,10 +52,9 @@ export default function LoginPage() {
         // Redirect to main workspace
         router.push("/dashboard");
       }
-    } catch (err: any) {
+    } catch (err) {
       setError(
-        err.response?.data?.detail || 
-        "Something went wrong. Make sure backend is running."
+        getApiError(err, "Something went wrong. Make sure backend is running.")
       );
     } finally {
       setLoading(false);

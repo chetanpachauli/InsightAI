@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
 import { 
   LayoutDashboard, 
   UploadCloud, 
@@ -17,16 +16,11 @@ import {
   DollarSign,
   Globe 
 } from "lucide-react";
-import api from "@/lib/api";
+import api, { useLocalStorage } from "@/lib/api";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const menuItems = [
     { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
@@ -43,7 +37,7 @@ export default function Sidebar() {
   const handleLogout = async () => {
     try {
       await api.post("/auth/logout");
-    } catch (e) {
+    } catch {
       console.error("Logout failed on server, clearing client anyway.");
     }
     localStorage.removeItem("access_token");
@@ -52,8 +46,8 @@ export default function Sidebar() {
     router.push("/login");
   };
 
-  const userRole = typeof window !== "undefined" ? localStorage.getItem("user_role") : "";
-  const userEmail = typeof window !== "undefined" ? localStorage.getItem("user_email") : "";
+  const userRole = useLocalStorage("user_role");
+  const userEmail = useLocalStorage("user_email");
 
   return (
     <aside className="w-64 bg-slate-900 border-r border-slate-800 text-slate-100 flex flex-col h-screen sticky top-0">
@@ -100,14 +94,14 @@ export default function Sidebar() {
       <div className="p-4 border-t border-slate-800 bg-slate-950/40 flex flex-col space-y-3">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-indigo-400 uppercase">
-            {mounted && userEmail ? userEmail[0] : "U"}
+            {userEmail ? userEmail[0] : "U"}
           </div>
           <div className="overflow-hidden">
-            <p className="text-xs font-semibold text-slate-200 truncate">{mounted && userEmail ? userEmail : "User Account"}</p>
+            <p className="text-xs font-semibold text-slate-200 truncate">{userEmail ? userEmail : "User Account"}</p>
             <div className="flex items-center space-x-1 mt-0.5">
               <ShieldCheck className="w-3 h-3 text-indigo-400" />
               <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-                {mounted && userRole ? userRole : "Employee"}
+                {userRole ? userRole : "Employee"}
               </span>
             </div>
           </div>

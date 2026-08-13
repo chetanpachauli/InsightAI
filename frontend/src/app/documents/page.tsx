@@ -2,16 +2,14 @@
 
 import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
-import api from "@/lib/api";
+import api, { getApiError } from "@/lib/api";
 import { 
   BookOpen, 
   UploadCloud, 
   MessageSquare, 
   Bot, 
-  User, 
   Loader2, 
-  ShieldAlert, 
-  ExternalLink 
+  ShieldAlert 
 } from "lucide-react";
 
 interface SearchSource {
@@ -55,10 +53,9 @@ export default function DocumentHubPage() {
         },
       });
       setSuccess(response.data.message);
-    } catch (err: any) {
+    } catch (err) {
       setError(
-        err.response?.data?.detail || 
-        "Failed to index document. Verify format is .txt or .md."
+        getApiError(err, "Failed to index document. Verify format is .txt or .md.")
       );
     } finally {
       setUploading(false);
@@ -78,7 +75,7 @@ export default function DocumentHubPage() {
         question: question.trim()
       });
       setSearchResult(response.data);
-    } catch (err: any) {
+    } catch {
       setError("Semantic query search failed. Make sure your Gemini API key is configured.");
     } finally {
       setSearching(false);

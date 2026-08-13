@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.database import engine, Base
 
@@ -20,9 +21,20 @@ from app.api.notifications import router as notifications_router
 from app.api.finance import router as finance_router
 from app.api.scraper import router as scraper_router
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Create database tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("Database tables created successfully!")
+    yield
+    # Shutdown: Cleanup (if needed)
+    print("Application shutdown")
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan
 )
 
 # Set up CORS middleware to allow React (Next.js) to communicate with FastAPI
@@ -33,13 +45,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-async def on_startup():
-    # Asynchronously create all database tables if they do not exist
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    print("Database tables created successfully!")
 
 # Register Routers
 app.include_router(auth_router, prefix=settings.API_V1_STR)

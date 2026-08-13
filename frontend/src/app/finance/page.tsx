@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
-import api from "@/lib/api";
+import api, { getApiError } from "@/lib/api";
 import { 
-  TrendingDown, 
   TrendingUp, 
   DollarSign, 
   UploadCloud, 
@@ -13,7 +12,6 @@ import {
   PieChart as PieIcon, 
   ArrowDownCircle, 
   ArrowUpCircle,
-  HelpCircle,
   FolderSync
 } from "lucide-react";
 import { 
@@ -21,7 +19,6 @@ import {
   Pie, 
   Cell, 
   Tooltip, 
-  Legend, 
   ResponsiveContainer, 
   BarChart, 
   Bar, 
@@ -104,10 +101,9 @@ export default function FinancePage() {
       setSuccess(response.data.message);
       setActiveTable(response.data.table_name);
       fetchStats(response.data.table_name);
-    } catch (err: any) {
+    } catch (err) {
       setError(
-        err.response?.data?.detail || 
-        "Failed to index bank statement. Verify structure and ensure Date and Description are column headers."
+        getApiError(err, "Failed to index bank statement. Verify structure and ensure Date and Description are column headers.")
       );
     } finally {
       setUploading(false);
@@ -121,7 +117,7 @@ export default function FinancePage() {
     try {
       const response = await api.get(`/finance/stats?table_name=${tableName}`);
       setStats(response.data);
-    } catch (e) {
+    } catch {
       setError("Failed to fetch categorized transactions statistics.");
     } finally {
       setLoadingStats(false);
@@ -139,7 +135,7 @@ export default function FinancePage() {
       setEditingTxId(null);
       // Refresh statistics locally
       fetchStats(activeTable);
-    } catch (e) {
+    } catch {
       setError("Failed to update transaction category.");
     }
   };

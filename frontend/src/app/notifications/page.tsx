@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
-import api from "@/lib/api";
+import api, { getApiError } from "@/lib/api";
 import { 
   Send, 
   Mail, 
   MessageSquare, 
   Loader2, 
   ShieldAlert, 
-  CheckCircle2, 
   History 
 } from "lucide-react";
 
@@ -36,7 +35,6 @@ export default function NotificationHubPage() {
 
   const fetchNotificationHistory = async () => {
     try {
-      setLoadingHistory(true);
       // Fetch latest logs from query/stats
       const response = await api.get("/query/stats");
       // Filter out manual notification events
@@ -44,7 +42,7 @@ export default function NotificationHubPage() {
         (log: AuditLog) => log.action === "MANUAL_NOTIFICATION"
       );
       setHistory(logs);
-    } catch (e) {
+    } catch {
       console.error("Failed to load dispatch history.");
     } finally {
       setLoadingHistory(false);
@@ -52,6 +50,7 @@ export default function NotificationHubPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchNotificationHistory();
   }, []);
 
@@ -74,10 +73,9 @@ export default function NotificationHubPage() {
       setSuccess(response.data.message);
       setMessage(""); // Clear message field
       fetchNotificationHistory(); // Refresh logs
-    } catch (err: any) {
+    } catch (err) {
       setError(
-        err.response?.data?.detail || 
-        "Failed to send notification. Verify SMTP or Twilio credentials."
+        getApiError(err, "Failed to send notification. Verify SMTP or Twilio credentials.")
       );
     } finally {
       setSending(false);

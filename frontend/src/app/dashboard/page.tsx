@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import api from "@/lib/api";
 import { 
-  TrendingUp, 
   FileText, 
   CheckCircle2, 
   Sliders, 
@@ -46,9 +45,6 @@ export default function DashboardPage() {
 
   const fetchDashboardData = async () => {
     try {
-      setLoading(true);
-      setError("");
-      
       // Concurrently fetch stats and AI insights
       const [statsRes, insightsRes] = await Promise.all([
         api.get("/query/stats"),
@@ -57,7 +53,7 @@ export default function DashboardPage() {
       
       setStats(statsRes.data);
       setInsights(insightsRes.data);
-    } catch (err: any) {
+    } catch {
       setError("Failed to fetch dashboard metrics. Please ensure the databases and backend server are running.");
     } finally {
       setLoading(false);
@@ -67,6 +63,21 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex">
+        <Sidebar />
+        <main className="flex-1 p-8 overflow-y-auto">
+          <div className="flex flex-col items-center justify-center py-40">
+            <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
+            <p className="text-slate-400 text-sm">Assembling analytics workspace...</p>
+            <p className="text-slate-500 text-xs mt-1">Running database aggregations & Gemini AI reports</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex">
@@ -94,7 +105,7 @@ export default function DashboardPage() {
             <div className="flex items-center space-x-3 bg-slate-900/50 border border-slate-800/80 px-4 py-3 rounded-2xl">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-xs font-semibold text-slate-300">
-                Welcome, <span className="text-indigo-400 font-bold">{userEmail?.split("@")[0] || "User"}</span> ({userRole})
+                Welcome, <span className="text-indigo-400 font-bold">{userEmail?.split("@")[0] || "User"}</span> ({userRole || "Employee"})
               </span>
             </div>
           </div>
@@ -108,14 +119,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-40">
-            <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-            <p className="text-slate-400 text-sm">Assembling analytics workspace...</p>
-            <p className="text-slate-500 text-xs mt-1">Running database aggregations & Gemini AI reports</p>
-          </div>
-        ) : (
-          <div className="space-y-8">
+        <div className="space-y-8">
             
             {/* 1. KPI Cards Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -205,12 +209,14 @@ export default function DashboardPage() {
                           Key Diagnostics
                         </h4>
                         <ul className="space-y-3">
-                          {insights.key_findings.map((item, idx) => (
+                          {(insights.key_findings && insights.key_findings.length > 0) ? insights.key_findings.map((item, idx) => (
                             <li key={idx} className="text-sm text-slate-300 flex items-start space-x-2.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0 mt-1.5" />
                               <span>{item}</span>
                             </li>
-                          ))}
+                          )) : (
+                            <li className="text-sm text-slate-500 italic">No key findings available</li>
+                          )}
                         </ul>
                       </div>
 
@@ -220,12 +226,14 @@ export default function DashboardPage() {
                           Action Recommendations
                         </h4>
                         <ul className="space-y-3">
-                          {insights.recommendations.map((item, idx) => (
+                          {(insights.recommendations && insights.recommendations.length > 0) ? insights.recommendations.map((item, idx) => (
                             <li key={idx} className="text-sm text-slate-300 flex items-start space-x-2.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0 mt-1.5" />
                               <span>{item}</span>
                             </li>
-                          ))}
+                          )) : (
+                            <li className="text-sm text-slate-500 italic">No recommendations available</li>
+                          )}
                         </ul>
                       </div>
 
@@ -248,7 +256,7 @@ export default function DashboardPage() {
                     <span>Real-time System Audit Logs</span>
                   </h2>
 
-                  {stats && stats.recent_logs.length > 0 ? (
+                  {stats && stats.recent_logs && stats.recent_logs.length > 0 ? (
                     <div className="flex-1 space-y-4">
                       {stats.recent_logs.map((log) => {
                         // Colored badges for different actions
@@ -292,7 +300,6 @@ export default function DashboardPage() {
             </div>
 
           </div>
-        )}
       </main>
     </div>
   );

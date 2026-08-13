@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
-import api from "@/lib/api";
+import api, { getApiError } from "@/lib/api";
 import { 
   Globe, 
   Search, 
@@ -21,7 +21,7 @@ export default function ScraperPage() {
   const [scraping, setScraping] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [scrapedData, setScrapedData] = useState<any[]>([]);
+  const [scrapedData, setScrapedData] = useState<Record<string, unknown>[]>([]);
   const [filename, setFilename] = useState("");
 
   const handleScrapeSubmit = async (e: React.FormEvent) => {
@@ -43,10 +43,9 @@ export default function ScraperPage() {
       setSuccess(response.data.message);
       setScrapedData(response.data.data);
       setFilename(response.data.filename);
-    } catch (err: any) {
+    } catch (err) {
       setError(
-        err.response?.data?.detail || 
-        "Failed to scrape webpage. Make sure target site is accessible and Gemini API key is configured."
+        getApiError(err, "Failed to scrape webpage. Make sure target site is accessible and Gemini API key is configured.")
       );
     } finally {
       setScraping(false);
@@ -83,7 +82,7 @@ export default function ScraperPage() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (err) {
+    } catch {
       setError("Failed to generate download file.");
     }
   };
@@ -241,7 +240,7 @@ export default function ScraperPage() {
                         {scrapedData.map((row, idx) => (
                           <tr key={idx} className="hover:bg-slate-800/10 transition">
                             {tableHeaders.map((header) => (
-                              <td key={header} className="p-3 border border-slate-850 max-w-[200px] truncate" title={row[header]}>
+                              <td key={header} className="p-3 border border-slate-850 max-w-[200px] truncate" title={String(row[header])}>
                                 {row[header] === null || row[header] === undefined ? "-" : String(row[header])}
                               </td>
                             ))}

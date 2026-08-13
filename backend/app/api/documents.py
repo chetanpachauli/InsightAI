@@ -183,7 +183,7 @@ async def query_knowledge_base(
         answer_text = "Gemini Key is offline. Could not complete RAG query."
         if gemini_service.is_configured():
             response = gemini_service.client.models.generate_content(
-                model='gemini-1.5-flash',
+                model='gemini-3.5-flash',
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     temperature=0.2 # Low temp for strict fact compliance

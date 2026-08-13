@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
-import api from "@/lib/api";
+import api, { getApiError } from "@/lib/api";
 import { 
   Sliders, 
   Plus, 
@@ -51,10 +51,9 @@ export default function RulesPage() {
 
   const fetchRules = async () => {
     try {
-      setLoading(true);
       const response = await api.get("/rules");
       setRules(response.data);
-    } catch (e: any) {
+    } catch {
       setError("Failed to load rules engine. Is backend online?");
     } finally {
       setLoading(false);
@@ -62,6 +61,7 @@ export default function RulesPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchRules();
   }, []);
 
@@ -92,8 +92,8 @@ export default function RulesPage() {
       setWebhookUrl("");
       
       fetchRules();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to create rule.");
+    } catch (err) {
+      setError(getApiError(err, "Failed to create rule."));
     } finally {
       setSubmitting(false);
     }
@@ -106,7 +106,7 @@ export default function RulesPage() {
       const response = await api.post(`/rules/${ruleId}/toggle`);
       setSuccess(`Rule "${response.data.name}" status updated.`);
       fetchRules();
-    } catch (e: any) {
+    } catch {
       setError("Failed to toggle rule state.");
     }
   };
@@ -120,7 +120,7 @@ export default function RulesPage() {
       await api.delete(`/rules/${ruleId}`);
       setSuccess("Rule deleted successfully.");
       fetchRules();
-    } catch (e: any) {
+    } catch {
       setError("Failed to delete rule.");
     }
   };
