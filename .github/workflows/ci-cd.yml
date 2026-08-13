@@ -83,4 +83,4 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: false # Set true and provide tags to upload to Docker Hub in production
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/insightai-backend:latest
+          tags: insightai-backend:latest
