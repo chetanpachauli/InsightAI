@@ -227,3 +227,50 @@ async def get_lineage(
             for a in audits
         ]
     }
+
+@router.delete("/{file_id}", status_code=status.HTTP_200_OK)
+async def delete_file(
+    file_id: int,
+    current_user: User = Depends(RoleChecker(allowed_roles=["Admin", "MIS"])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete an uploaded file from registry, delete its local physical file,
+    and drop any dynamic PostgreSQL database table created from it.
+    Restricted to Admin and MIS roles.
+    """
+    result = await db.execute(select(UploadedFile).where(UploadedFile.id == file_id))
+    db_file = result.scalars().first()
+    if not db_file:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # 1. Drop the dynamic database table if it was created
+    lineage = db_file.lineage_info or {}
+    table_name = lineage.get("db_table")
+    if table_name:
+        try:
+            await db.execute(text(f"DROP TABLE IF EXISTS {table_name};"))
+        except Exception as table_err:
+            print(f"Failed to drop table {table_name} during file deletion: {table_err}")
+
+    # 2. Delete the physical file from the uploads directory
+    if db_file.file_path and os.path.exists(db_file.file_path):
+        try:
+            os.remove(db_file.file_path)
+        except Exception as file_err:
+            print(f"Failed to delete physical file {db_file.file_path}: {file_err}")
+
+    # 3. Create audit log entry
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="FILE_DELETE",
+        details=f"Deleted file '{db_file.filename}' version {db_file.version} (ID {file_id}) and dropped table '{table_name or 'none'}'",
+        lineage_step="FILE_DELETED"
+    )
+    db.add(audit)
+
+    # 4. Remove database record
+    await db.delete(db_file)
+    await db.commit()
+
+    return {"message": "File and associated data deleted successfully."}

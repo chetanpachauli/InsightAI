@@ -12,7 +12,8 @@ import {
   CheckSquare, 
   Activity, 
   ShieldAlert, 
-  RefreshCw 
+  RefreshCw,
+  Trash2
 } from "lucide-react";
 
 interface FileItem {
@@ -33,6 +34,7 @@ interface LineageLog {
 }
 
 interface LineageFileDetails {
+  id: number;
   filename: string;
   version: number;
 }
@@ -102,6 +104,24 @@ export default function UploadsPage() {
       fetchFiles();
     } catch (err) {
       setError(getApiError(err, "Approval action failed."));
+    }
+  };
+
+  const handleDelete = async (fileId: number) => {
+    if (!window.confirm("Are you sure you want to delete this file version, its local storage, and its database table?")) {
+      return;
+    }
+    setError("");
+    setSuccess("");
+    try {
+      await api.delete(`/files/${fileId}`);
+      setSuccess("File and database records deleted successfully.");
+      fetchFiles();
+      if (selectedLineageFile && selectedLineageFile.id === fileId) {
+        setSelectedLineageFile(null);
+      }
+    } catch (err) {
+      setError(getApiError(err, "Failed to delete file."));
     }
   };
 
@@ -268,7 +288,6 @@ export default function UploadsPage() {
                             </span>
                           </td>
                           <td className="py-4 text-right space-x-2">
-                            {/* Lineage Button */}
                             <button
                               onClick={() => handleViewLineage(file.id)}
                               className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-all"
@@ -276,6 +295,17 @@ export default function UploadsPage() {
                             >
                               <Activity className="w-4 h-4" />
                             </button>
+
+                            {/* Delete Button (Restricted to Admin & MIS) */}
+                            {(userRole === "Admin" || userRole === "MIS") && (
+                              <button
+                                onClick={() => handleDelete(file.id)}
+                                className="p-2 hover:bg-red-950/25 text-slate-400 hover:text-red-400 rounded-lg transition-all"
+                                title="Delete File & Table"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
 
                             {/* Manager Review Button */}
                             {userRole === "Manager" && file.workflow_status === "DRAFT" && file.status === "COMPLETED" && (
