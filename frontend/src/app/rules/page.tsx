@@ -79,7 +79,7 @@ export default function RulesPage() {
         operator,
         value: val,
         action_type: action,
-        recipient: action === "EMAIL" ? recipient : null,
+        recipient: (action === "EMAIL" || action === "WHATSAPP") ? recipient : null,
         webhook_url: action === "WEBHOOK" ? webhookUrl : null,
       });
 
