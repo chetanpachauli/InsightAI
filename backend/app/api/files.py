@@ -9,7 +9,6 @@ from app.models.audit_logs import AuditLog
 from app.api.schemas import FileOut
 from app.core.config import settings
 import os
-import shutil
 from datetime import datetime
 from typing import List
 
@@ -43,6 +42,22 @@ async def upload_file(
             detail="Invalid file format. Only .csv, .xlsx, and .xls are supported."
         )
 
+    # 1b. Enforce upload size limit (read streamed bytes, abort if too large)
+    max_bytes = settings.MAX_FILE_UPLOAD_MB * 1024 * 1024
+    total_bytes = 0
+    chunks = []
+    while True:
+        chunk = await file.read(1024 * 1024)  # 1MB chunks
+        if not chunk:
+            break
+        total_bytes += len(chunk)
+        if total_bytes > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File exceeds the {settings.MAX_FILE_UPLOAD_MB}MB upload limit."
+            )
+        chunks.append(chunk)
+
     # 2. Check for existing file to handle Version Control (v1, v2, v3...)
     result = await db.execute(
         select(UploadedFile)
@@ -63,7 +78,8 @@ async def upload_file(
     
     try:
         with open(target_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            for chunk in chunks:
+                buffer.write(chunk)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -162,7 +178,7 @@ async def approve_file(
     db_file.approved_by_id = current_user.id
     
     # Update lineage info history list
-    lineage = db_file.lineage_info or {}
+    lineage = dict(db_file.lineage_info or {})
     history = lineage.get("approval_history", [])
     history.append({
         "from_state": old_status,

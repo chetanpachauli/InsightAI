@@ -235,7 +235,7 @@ class ETLService:
             # 6. Update File status & Lineage
             file_record.status = "COMPLETED"
             
-            lineage = file_record.lineage_info or {}
+            lineage = dict(file_record.lineage_info or {})
             lineage.update({
                 "processed_at": datetime.utcnow().isoformat(),
                 "db_table": dynamic_table_name,

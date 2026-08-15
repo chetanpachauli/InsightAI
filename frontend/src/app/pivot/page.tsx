@@ -79,24 +79,23 @@ export default function PivotPage() {
     try {
       // Find the file name and version
       const file = files.find((f) => f.id === parseInt(fileId));
-      if (!file || !file.lineage_info?.db_table) return;
+      if (!file) return;
 
-      const tableName = file.lineage_info.db_table;
+      let tableName = file.lineage_info?.db_table;
+      if (!tableName) {
+        // Fallback: build table name using filename and version convention
+        const cleanSlug = file.filename.toLowerCase().split(".")[0].replace(/[^a-z0-9]/g, "_");
+        tableName = `data_${cleanSlug}_v${file.version}`;
+      }
       
-      // Execute SQL to fetch the raw table records
-      // Safe read-only SELECT
-      const response = await api.post("/query/chat", {
-        question: `Select all records from table ${tableName}`
+      // Fetch the raw table records from a dedicated, Gemini-free endpoint
+      const response = await api.post("/query/raw-data", {
+        table_name: tableName
       });
 
       if (response.data.data && response.data.data.length > 0) {
         setRawData(response.data.data);
-        
-        // Extract headers from columns (ignore system columns starting with _)
-        const headers = Object.keys(response.data.data[0]).filter(
-          (k) => !k.startsWith("_")
-        );
-        setColumns(headers);
+        setColumns(response.data.columns || []);
       } else {
         setError("No data records found in this table.");
       }
