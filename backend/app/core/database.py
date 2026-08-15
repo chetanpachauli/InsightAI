@@ -5,7 +5,7 @@ from app.core.config import settings
 # Create async engine for PostgreSQL
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=True, # Logs generated SQL queries, useful for development
+    echo=settings.DB_ECHO,  # Set DB_ECHO=true in .env to log SQL queries
     future=True
 )
 

@@ -46,6 +46,7 @@ export default function RulesPage() {
   const [recipient, setRecipient] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [testingRules, setTestingRules] = useState(false);
 
   const userRole = typeof window !== "undefined" ? localStorage.getItem("user_role") : "";
 
@@ -122,6 +123,23 @@ export default function RulesPage() {
       fetchRules();
     } catch {
       setError("Failed to delete rule.");
+    }
+  };
+
+  const handleTestAllRules = async () => {
+    setError("");
+    setSuccess("");
+    setTestingRules(true);
+
+    try {
+      const response = await api.post("/rules/test-all");
+      setSuccess(
+        `✅ ${response.data.message}. Tested ${response.data.active_rules_count} rule(s) on ${response.data.tables_tested.length} table(s). Check Dashboard for triggered alerts!`
+      );
+    } catch (err) {
+      setError(getApiError(err, "Failed to test rules. Make sure you have approved files uploaded."));
+    } finally {
+      setTestingRules(false);
     }
   };
 
@@ -318,7 +336,30 @@ export default function RulesPage() {
           {/* Right Panel: List Rules */}
           <div className="lg:col-span-2">
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl">
-              <h2 className="text-lg font-bold text-slate-200 mb-6">Registered Rules Dashboard</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-bold text-slate-200">Registered Rules Dashboard</h2>
+                
+                {/* Test All Rules Button */}
+                {(userRole === "Admin" || userRole === "Manager" || userRole === "MIS") && rules.length > 0 && (
+                  <button
+                    onClick={handleTestAllRules}
+                    disabled={testingRules}
+                    className="flex items-center space-x-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {testingRules ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Testing Rules...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Bell className="w-3.5 h-3.5" />
+                        <span>Test All Rules Now</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
 
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-20">

@@ -4,9 +4,9 @@ from sqlalchemy import text
 from app.core.database import get_db, SessionLocal
 from app.api.deps import get_current_user
 from app.models.users import User
-from app.models.files import UploadedFile
 from app.models.audit_logs import AuditLog
 from app.services.gemini_service import gemini_service
+from app.core.config import settings
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 import polars as pl
@@ -46,9 +46,16 @@ async def upload_bank_statement(
     os.makedirs("uploads", exist_ok=True)
     
     try:
-        content = await file.read()
+        content = await file.read(settings.MAX_FILE_UPLOAD_MB * 1024 * 1024 + 1)
+        if len(content) > settings.MAX_FILE_UPLOAD_MB * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File exceeds the {settings.MAX_FILE_UPLOAD_MB}MB upload limit."
+            )
         with open(target_path, "wb") as f:
             f.write(content)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -165,26 +172,10 @@ async def upload_bank_statement(
             })
             rows_inserted += 1
 
-        # 7. Log to file lineage registry
-        lineage_info = {
-            "action": "FINANCE_UPLOAD",
-            "db_table": dynamic_table_name,
-            "columns": ["date", "description", "debit", "credit", "category"],
-            "categorized_items_count": len(category_map)
-        }
-        
-        db_file = UploadedFile(
-            filename=filename,
-            version=1,
-            file_path=target_path,
-            status="COMPLETED",
-            workflow_status="APPROVED", # Finance sheets are immediately approved for the individual user
-            owner_id=current_user.id,
-            lineage_info=lineage_info
-        )
-        db.add(db_file)
-        
-        # Audit Logs
+        # 7. Audit Logs. NOTE: personal finance statements are intentionally NOT
+        # registered in the shared UploadedFile registry, so they stay private to
+        # the owning user and never leak into AI Chat / Pivot (which query all
+        # APPROVED/COMPLETED shared tables).
         audit = AuditLog(
             user_id=current_user.id,
             action="FINANCE_STATEMENT_PROCESSED",

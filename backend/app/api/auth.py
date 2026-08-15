@@ -3,15 +3,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, verify_token
+from app.core.config import settings
 from app.models.users import User
 from app.api.schemas import UserCreate, UserLogin, TokenResponse, UserOut
 from typing import Optional
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+# Roles that users may self-register with. Admin/CEO accounts must be created
+# via the seed_admin.py script to prevent privilege escalation.
+SELF_REGISTERABLE_ROLES = {"Employee", "MIS", "Manager"}
+
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
-    """Create a new user in the system."""
+    """Create a new user in the system. Role is restricted to safe defaults."""
+    # Prevent privilege escalation: nobody can self-register as Admin/CEO
+    if user_in.role not in SELF_REGISTERABLE_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Self-registration is not allowed for role '{user_in.role}'. "
+                   f"Allowed roles: {', '.join(sorted(SELF_REGISTERABLE_ROLES))}."
+        )
+
     # Check if user already exists
     result = await db.execute(select(User).where(User.email == user_in.email))
     existing_user = result.scalars().first()
@@ -45,14 +58,15 @@ async def login(
     
     if not user or not verify_password(user_in.password, user.hashed_password):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Incorrect email or password."
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
         
     if not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User account is deactivated."
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account is deactivated.",
         )
         
     # Generate tokens
@@ -64,7 +78,7 @@ async def login(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False, # Set True in production (requires HTTPS)
+        secure=settings.COOKIE_SECURE,  # Set COOKIE_SECURE=true in production (HTTPS)
         samesite="lax",
         max_age=7 * 24 * 60 * 60 # 7 days
     )

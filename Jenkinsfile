@@ -46,6 +46,8 @@ pipeline {
         stage('Docker Compilation') {
             steps {
                 echo 'Verifying Docker Compose and Packaging Containers...'
+                // .env is gitignored, so ensure it exists or docker compose config fails
+                sh 'test -f .env || touch .env'
                 sh 'docker compose config'
                 // sh 'docker compose build' // Uncomment in production to auto-compile
             }

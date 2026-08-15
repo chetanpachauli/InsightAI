@@ -19,6 +19,9 @@ router = APIRouter(prefix="/query", tags=["AI Analytics & Querying"])
 class ChatQueryRequest(BaseModel):
     question: str
 
+class RawTableRequest(BaseModel):
+    table_name: str
+
 @router.post("/chat")
 async def chat_with_data(
     query_in: ChatQueryRequest,
@@ -86,6 +89,12 @@ async def chat_with_data(
     full_schema_context = "\n\n".join(schema_descriptions)
 
     # 3. Call Gemini service to write SQL
+    if not gemini_service.is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Gemini API key is not configured. Add GEMINI_API_KEY to your .env file to enable AI chat queries."
+        )
+
     ai_response = gemini_service.generate_sql_from_nl(
         user_question=query_in.question,
         schema_description=full_schema_context
@@ -102,6 +111,17 @@ async def chat_with_data(
              status_code=status.HTTP_400_BAD_REQUEST,
              detail="For security, only SELECT query executions are permitted."
          )
+
+    # Reject statement chaining: a single read-only SELECT should never contain ';'
+    sql_query = sql_query.strip()
+    if sql_query.endswith(";"):
+        sql_query = sql_query[:-1].strip()
+    if ";" in sql_query:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Security alert: multi-statement SQL is not permitted."
+        )
+    query_upper = sql_query.upper()
          
     destructive_keywords = ["DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "TRUNCATE", "CREATE"]
     for keyword in destructive_keywords:
@@ -147,6 +167,85 @@ async def chat_with_data(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error executing AI-generated SQL query: {str(e)}. (Generated SQL was: {sql_query})"
         )
+
+@router.post("/raw-data")
+async def get_raw_table_data(
+    req: RawTableRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Fetch raw rows from an approved & completed data table without involving
+    Gemini. Used by the Pivot Builder for fast, deterministic table reads.
+    """
+    # 1. Validate table identifier format (SQL injection guard)
+    if not re.match(r'^[a-zA-Z0-9_]+$', req.table_name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid table name format. Only alphanumeric characters and underscores are allowed."
+        )
+
+    # 2. Only allow tables that are COMPLETED and APPROVED in the registry
+    result = await db.execute(
+        select(UploadedFile)
+        .where(UploadedFile.status == "COMPLETED")
+        .where(UploadedFile.workflow_status == "APPROVED")
+    )
+    approved_files = result.scalars().all()
+
+    approved_table_names = set()
+    for file in approved_files:
+        lineage = file.lineage_info or {}
+        table_name = lineage.get("db_table")
+        if not table_name:
+            clean_slug = re.sub(r"[^a-z0-9]", "_", file.filename.lower().split(".")[0])
+            table_name = f"data_{clean_slug}_v{file.version}"
+        approved_table_names.add(table_name)
+
+    if req.table_name not in approved_table_names:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Table is not an approved dataset."
+        )
+
+    # 3. Verify the physical table exists before reading
+    try:
+        table_check = await db.execute(text(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = :tbl)"
+        ), {"tbl": req.table_name})
+        if not table_check.scalar():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Table '{req.table_name}' does not exist."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error verifying table existence: {str(e)}"
+        )
+
+    # 4. Fetch rows (capped to protect the browser from very large tables)
+    try:
+        query_result = await db.execute(text(
+            f'SELECT * FROM "{req.table_name}" ORDER BY _row_id LIMIT 5000'
+        ))
+        rows = [dict(row) for row in query_result.mappings()]
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read table '{req.table_name}': {str(e)}"
+        )
+
+    columns = [key for key in (rows[0].keys() if rows else []) if not key.startswith("_")]
+
+    return {
+        "table_name": req.table_name,
+        "columns": columns,
+        "data": rows,
+        "total_rows": len(rows)
+    }
 
 @router.get("/insights")
 async def get_executive_insights(
@@ -219,10 +318,14 @@ async def get_executive_insights(
 
 @router.get("/stats")
 async def get_dashboard_stats(
+    limit: int = 5,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Retrieve high-level counters and the latest audit trail entries for the dashboard."""
+    # Keep the limit sane
+    limit = max(1, min(limit, 100))
+
     # Count total files
     files_count = await db.execute(select(func.count(UploadedFile.id)))
     total_files = files_count.scalar() or 0
@@ -241,11 +344,11 @@ async def get_dashboard_stats(
     )
     total_rules = rules_count.scalar() or 0
     
-    # Fetch recent 5 audit logs
+    # Fetch recent audit logs
     logs_result = await db.execute(
         select(AuditLog)
         .order_by(AuditLog.created_at.desc())
-        .limit(5)
+        .limit(limit)
     )
     recent_logs = logs_result.scalars().all()
     

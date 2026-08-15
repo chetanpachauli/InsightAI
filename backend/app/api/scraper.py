@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.api.deps import get_current_user
@@ -6,6 +6,8 @@ from app.models.users import User
 from app.models.files import UploadedFile
 from app.models.audit_logs import AuditLog
 from app.services.gemini_service import gemini_service
+from app.api.files import run_etl_task
+from app.core.config import settings
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import httpx
@@ -14,6 +16,9 @@ import csv
 import json
 import os
 import re
+import socket
+import ipaddress
+from urllib.parse import urlparse
 from datetime import datetime
 
 router = APIRouter(prefix="/scraper", tags=["AI Web Scraper"])
@@ -22,9 +27,29 @@ class ScrapeRequest(BaseModel):
     url: str
     extraction_goal: str
 
+def is_blocked_ssrf_target(url: str) -> bool:
+    """Reject URLs that resolve to private, loopback, or link-local IPs (SSRF guard)."""
+    hostname = urlparse(url).hostname
+    if not hostname:
+        return True
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        return True  # Unresolvable host -> cannot verify, block it
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            continue
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+            return True
+    return False
+
 @router.post("/extract", status_code=status.HTTP_200_OK)
 async def extract_website_data(
     req: ScrapeRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -42,11 +67,19 @@ async def extract_website_data(
             detail="Invalid URL. Must begin with http:// or https://"
         )
 
+    # 1b. SSRF guard: block internal/private network targets
+    if is_blocked_ssrf_target(url):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This URL resolves to a private or internal network address and cannot be scraped."
+        )
+
     # 2. Fetch raw HTML content
     html_content = ""
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
+    max_bytes = settings.MAX_FILE_UPLOAD_MB * 1024 * 1024
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=headers, timeout=15.0, follow_redirects=True)
@@ -55,7 +88,21 @@ async def extract_website_data(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Target website returned status code: {response.status_code}"
                 )
+            # Guard against huge pages (SSRF-safe memory limit)
+            declared_size = response.headers.get("content-length")
+            if declared_size and declared_size.isdigit() and int(declared_size) > max_bytes:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"Target page exceeds the {settings.MAX_FILE_UPLOAD_MB}MB size limit."
+                )
             html_content = response.text
+            if len(html_content.encode("utf-8")) > max_bytes:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"Target page exceeds the {settings.MAX_FILE_UPLOAD_MB}MB size limit."
+                )
+    except HTTPException:
+        raise
     except Exception as fetch_err:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -149,12 +196,13 @@ async def extract_website_data(
             for row in scraped_data:
                 writer.writerow(row)
                 
-        # Register file in database registry
+        # Register file in database registry. Status starts as PENDING so the
+        # background ETL pipeline converts the CSV into a real queryable table.
         db_file = UploadedFile(
             filename=csv_filename,
             version=1,
             file_path=target_path,
-            status="COMPLETED",
+            status="PENDING",
             workflow_status="DRAFT", # Starts as draft so managers can audit and approve before SQL chat
             owner_id=current_user.id,
             lineage_info={
@@ -165,6 +213,8 @@ async def extract_website_data(
             }
         )
         db.add(db_file)
+        await db.flush()
+        file_id = db_file.id
 
         # Audit log tracking
         audit = AuditLog(
@@ -176,6 +226,11 @@ async def extract_website_data(
         db.add(audit)
         
         await db.commit()
+
+        # Convert CSV into a real PostgreSQL table (background) so the sheet can
+        # be queried via AI Chat / Pivot after approval.
+        background_tasks.add_task(run_etl_task, file_id)
+
         return {
             "message": f"Website scraped successfully! Compiled {len(scraped_data)} rows.",
             "data": scraped_data,

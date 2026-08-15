@@ -155,8 +155,8 @@ export default function LoginPage() {
                   <option value="Employee">Employee (View Only)</option>
                   <option value="MIS">MIS (Upload & Create Rules)</option>
                   <option value="Manager">Manager (Review Reports & Rules)</option>
-                  <option value="CEO">CEO (Approve Final Data & View)</option>
-                  <option value="Admin">Admin (Full Control)</option>
+                  <option value="CEO" disabled>CEO (Approve Final Data & View) - contact admin</option>
+                  <option value="Admin" disabled>Admin (Full Control) - contact admin</option>
                 </select>
               </div>
             </div>

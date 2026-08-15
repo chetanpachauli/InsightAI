@@ -64,11 +64,18 @@ async def toggle_rule(
     current_user: User = Depends(RoleChecker(allowed_roles=["Admin", "Manager", "MIS"])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Toggle a rule between Active and Inactive states."""
+    """Toggle a rule between Active and Inactive states. Owners and Admins only."""
     result = await db.execute(select(AlertRule).where(AlertRule.id == rule_id))
     db_rule = result.scalars().first()
     if not db_rule:
         raise HTTPException(status_code=404, detail="Rule not found")
+
+    # Ownership enforcement: only the rule owner or an Admin may modify it
+    if current_user.role != "Admin" and db_rule.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only modify alert rules that you created."
+        )
         
     db_rule.is_active = not db_rule.is_active
     
@@ -91,11 +98,18 @@ async def delete_rule(
     current_user: User = Depends(RoleChecker(allowed_roles=["Admin", "Manager", "MIS"])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Delete a rule entirely from the system."""
+    """Delete a rule entirely from the system. Owners and Admins only."""
     result = await db.execute(select(AlertRule).where(AlertRule.id == rule_id))
     db_rule = result.scalars().first()
     if not db_rule:
         raise HTTPException(status_code=404, detail="Rule not found")
+
+    # Ownership enforcement: only the rule owner or an Admin may delete it
+    if current_user.role != "Admin" and db_rule.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete alert rules that you created."
+        )
         
     # Audit trail
     audit = AuditLog(
@@ -109,3 +123,78 @@ async def delete_rule(
     await db.delete(db_rule)
     await db.commit()
     return None
+
+@router.post("/test-all", status_code=status.HTTP_200_OK)
+async def test_all_rules(
+    current_user: User = Depends(RoleChecker(allowed_roles=["Admin", "Manager", "MIS"])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Manually trigger all active rules against all approved data tables.
+    This allows testing rules without waiting for new file uploads.
+    """
+    from app.models.files import UploadedFile
+    from app.services.etl import ETLService
+    from sqlalchemy import text
+    
+    # Get all approved files
+    result = await db.execute(
+        select(UploadedFile).where(
+            UploadedFile.workflow_status == "APPROVED",
+            UploadedFile.status == "COMPLETED"
+        )
+    )
+    approved_files = result.scalars().all()
+    
+    if not approved_files:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No approved data tables found. Please upload and approve files first."
+        )
+    
+    etl_service = ETLService()
+    tested_tables = []
+    triggered_count = 0
+    
+    for file_record in approved_files:
+        lineage = file_record.lineage_info or {}
+        table_name = lineage.get("db_table")
+        
+        if not table_name:
+            continue
+            
+        # Verify table exists
+        try:
+            table_check = await db.execute(text(
+                "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = :tbl)"
+            ), {"tbl": table_name})
+            exists = table_check.scalar()
+            
+            if exists:
+                # Run rules check on this table
+                await etl_service.check_rules_on_table(table_name, db)
+                tested_tables.append(table_name)
+        except Exception as e:
+            print(f"Error testing rules on table {table_name}: {str(e)}")
+            continue
+    
+    # Count how many rules were checked
+    rules_result = await db.execute(select(AlertRule).where(AlertRule.is_active == True))
+    active_rules_count = len(rules_result.scalars().all())
+    
+    # Audit trail
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="RULES_TEST",
+        details=f"Manually triggered {active_rules_count} active rules across {len(tested_tables)} approved tables: {', '.join(tested_tables) if tested_tables else 'none'}",
+        lineage_step="RULE_ENGINE_TEST"
+    )
+    db.add(audit)
+    await db.commit()
+    
+    return {
+        "status": "SUCCESS",
+        "message": f"Tested {active_rules_count} active rules against {len(tested_tables)} approved tables",
+        "tables_tested": tested_tables,
+        "active_rules_count": active_rules_count
+    }

@@ -35,8 +35,8 @@ export default function NotificationHubPage() {
 
   const fetchNotificationHistory = async () => {
     try {
-      // Fetch latest logs from query/stats
-      const response = await api.get("/query/stats");
+      // Fetch a wider set of recent logs so the dispatch history is complete
+      const response = await api.get("/query/stats?limit=50");
       // Filter out manual notification events
       const logs = response.data.recent_logs.filter(
         (log: AuditLog) => log.action === "MANUAL_NOTIFICATION"
