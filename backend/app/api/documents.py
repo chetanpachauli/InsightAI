@@ -7,8 +7,11 @@ from app.models.users import User
 from app.models.documents import DocumentChunk
 from app.models.audit_logs import AuditLog
 from app.services.gemini_service import gemini_service
+from google.genai import types
 from pydantic import BaseModel
 from typing import List, Optional
+from app.core.config import settings
+import os
 import math
 import json
 
@@ -27,14 +30,14 @@ def cosine_similarity(v1: List[float], v2: List[float]) -> float:
     return dot_product / (norm_v1 * norm_v2)
 
 def generate_embedding(text: str) -> List[float]:
-    """Call Gemini to generate a 768-dimension vector embedding."""
+    """Call Gemini to generate a 3072-dimension vector embedding."""
     if not gemini_service.is_configured():
         # Fallback dummy vector for dry run tests if key is missing
-        return [0.1] * 768
+        return [0.1] * 3072
 
     try:
         response = gemini_service.client.models.embed_content(
-            model="text-embedding-004",
+            model="gemini-embedding-001",
             contents=text
         )
         # Extract values
@@ -60,8 +63,13 @@ async def upload_document(
         )
 
     try:
-        # Read content
-        content_bytes = await file.read()
+        # Read content (with size guard to avoid memory abuse)
+        content_bytes = await file.read(settings.MAX_FILE_UPLOAD_MB * 1024 * 1024 + 1)
+        if len(content_bytes) > settings.MAX_FILE_UPLOAD_MB * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File exceeds the {settings.MAX_FILE_UPLOAD_MB}MB upload limit."
+            )
         content_text = content_bytes.decode("utf-8")
         
         # 1. Chunking logic (500 chars limit, 100 overlap)
@@ -212,6 +220,3 @@ async def query_knowledge_base(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Search failed: {str(e)}"
         )
-
-import os
-from google.genai import types
