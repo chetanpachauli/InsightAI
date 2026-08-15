@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/insightai"
     # Echo all generated SQL to console (useful for dev, disable in production)
     DB_ECHO: bool = False
+    # Auto-create tables on startup (dev convenience). In production set to false
+    # and use `alembic upgrade head` so schema changes go through migrations.
+    AUTO_CREATE_TABLES: bool = True
     
     # Security Configuration
     JWT_SECRET_KEY: str = ""  # MUST be set via .env / environment in any environment

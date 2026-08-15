@@ -4,6 +4,7 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV AUTO_CREATE_TABLES=false
 
 # Set work directory
 WORKDIR /workspace
@@ -21,9 +22,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy backend source code
 COPY ./app ./app
+COPY ./alembic ./alembic
+COPY ./alembic.ini .
+COPY ./docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Expose FastAPI default port
 EXPOSE 8000
 
-# Run uvicorn server
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Run migrations then start the API server
+ENTRYPOINT ["docker-entrypoint.sh"]

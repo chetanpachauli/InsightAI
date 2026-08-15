@@ -3,6 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.database import engine, Base
+from app.core.logging_setup import setup_logging
+from app.core.request_context import RequestContextMiddleware
+from app.core.exceptions import register_exception_handlers
+
+# Initialize structured (JSON) logging before anything else
+setup_logging()
 
 # Import models to ensure they are registered with SQLAlchemy Base before creation
 from app.models.users import User
@@ -23,10 +29,12 @@ from app.api.scraper import router as scraper_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Create database tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    print("Database tables created successfully!")
+    # Startup: Apply schema if running in dev mode without migrations.
+    # In production set AUTO_CREATE_TABLES=false and run `alembic upgrade head`.
+    if settings.AUTO_CREATE_TABLES:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("Database tables created successfully!")
     yield
     # Shutdown: Cleanup (if needed)
     print("Application shutdown")
@@ -36,6 +44,12 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan
 )
+
+# Register global exception handlers (must be before adding middleware)
+register_exception_handlers(app)
+
+# Attach request correlation middleware (assigns X-Request-ID + structured logs)
+app.add_middleware(RequestContextMiddleware)
 
 # Set up CORS middleware to allow React (Next.js) to communicate with FastAPI
 # Origins are restricted to the configured frontend URLs (see CORS_ORIGINS in .env).
