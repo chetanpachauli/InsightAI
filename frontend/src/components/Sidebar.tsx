@@ -32,6 +32,7 @@ export default function Sidebar() {
     { name: "Notification Hub", path: "/notifications", icon: Send },
     { name: "Finance AI", path: "/finance", icon: DollarSign },
     { name: "Web Scraper", path: "/scraper", icon: Globe },
+    { name: "🎙️ Voice Assistant", path: "/voice", icon: MessageSquareCode },
   ];
 
   const handleLogout = async () => {
