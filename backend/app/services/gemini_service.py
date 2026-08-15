@@ -59,9 +59,10 @@ class GeminiService:
 
         Guidelines:
         1. Only generate read-only SELECT queries. Never write INSERT, UPDATE, DELETE, or DROP.
-        2. Ensure column names and table names match the schema exactly.
-        3. Determine if the data can be visualized using a chart. If yes, specify the chart type ('bar', 'line', 'pie') and identify which columns to map to the X and Y axes.
-        4. If it's a simple single-value response or table-only report, set chart_type to 'table' or 'none'.
+        2. Ensure column names and table names match the schemas exactly.
+        3. MULTI-TABLE RELATIONSHIPS: If the user's question involves columns, indicators, or metrics spread across multiple different tables, identify key columns that link them (such as common names, email links, codes, or transactional tags) and output the SQL query using INNER JOIN or LEFT JOIN. Always prefix column names with their respective table name (e.g. table_name.column_name) to avoid ambiguous column reference errors in PostgreSQL.
+        4. Determine if the data can be visualized using a chart. If yes, specify the chart type ('bar', 'line', 'pie') and identify which columns to map to the X and Y axes.
+        5. If it's a simple single-value response or table-only report, set chart_type to 'table' or 'none'.
         """
 
         try:
