@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # Mark refresh-token cookie as Secure (requires HTTPS). Enable in production.
     COOKIE_SECURE: bool = False
     # Comma-separated list of allowed CORS origins (frontend URLs)
-    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,https://frontend-nine-woad-19.vercel.app"
     
     # Redis & Celery
     REDIS_URL: str = "redis://localhost:6379/0"
