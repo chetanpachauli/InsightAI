@@ -216,6 +216,7 @@ export default function RulesPage() {
                         <option value="SALES">Sales</option>
                         <option value="INVENTORY">Inventory</option>
                         <option value="FINANCE">Finance</option>
+                        <option value="ANOMALY">Statistical Anomaly (AI Outlier)</option>
                         <option value="CUSTOM">Custom</option>
                       </select>
                     </div>
@@ -250,19 +251,20 @@ export default function RulesPage() {
                         <option value="==">==</option>
                         <option value="<=">&lt;=</option>
                         <option value=">=">&gt;=</option>
+                        <option value="ANOMALY">Z-Score (&ge;)</option>
                       </select>
                     </div>
 
                     <div className="col-span-2">
                       <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-                        Threshold Value
+                        {operator === "ANOMALY" ? "Z-Score Threshold (σ)" : "Threshold Value"}
                       </label>
                       <input
                         type="text"
                         required
                         value={val}
                         onChange={(e) => setVal(e.target.value)}
-                        placeholder="e.g. 50000, 20"
+                        placeholder={operator === "ANOMALY" ? "e.g. 3.0 (99.7% confidence)" : "e.g. 50000, 20"}
                         className="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl outline-none text-slate-100 text-sm focus:border-indigo-500 transition"
                       />
                     </div>
@@ -421,7 +423,9 @@ export default function RulesPage() {
                         <div className="flex justify-between">
                           <span className="text-slate-500 font-medium">Condition:</span>
                           <span className="font-mono text-indigo-400 font-semibold">
-                            IF {rule.condition_col} {rule.operator} {rule.value}
+                            {rule.operator === "ANOMALY" || rule.rule_type === "ANOMALY"
+                              ? `Z-Score(${rule.condition_col}) >= ${rule.value}σ`
+                              : `IF ${rule.condition_col} ${rule.operator} ${rule.value}`}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">

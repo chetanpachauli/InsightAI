@@ -232,6 +232,25 @@ class ETLService:
                     else:
                         print(f"Partial success: {successful_inserts}/{len(records)} rows inserted. {len(failed_rows)} failures.")
 
+            # Automatic Statistical Outlier Analysis (Z-score across numerical columns)
+            anomalies_detected = []
+            for c in clean_headers:
+                if df[c].dtype in [pl.Int64, pl.Int32, pl.Int16, pl.Int8, pl.Float64, pl.Float32]:
+                    series = df[c].drop_nulls()
+                    if len(series) >= 4:
+                        mean_val = series.mean()
+                        std_val = series.std()
+                        if std_val and std_val > 0:
+                            outliers = series.filter(((series - mean_val).abs() / std_val) >= 3.0)
+                            if len(outliers) > 0:
+                                anomalies_detected.append({
+                                    "column": c,
+                                    "outlier_count": len(outliers),
+                                    "mean": round(float(mean_val), 2),
+                                    "std_dev": round(float(std_val), 2),
+                                    "sample_outliers": [round(float(v), 2) for v in outliers[:3]]
+                                })
+
             # 6. Update File status & Lineage
             file_record.status = "COMPLETED"
             
@@ -243,7 +262,8 @@ class ETLService:
                     "total_rows": total_rows,
                     "total_columns": total_cols,
                     "duplicate_rows_detected": duplicate_count,
-                    "missing_cells_detected": null_count
+                    "missing_cells_detected": null_count,
+                    "statistical_anomalies": anomalies_detected
                 },
                 "columns_mapped": [
                     {"original": orig, "cleaned": clean, "type": self.map_polars_to_postgres(df[clean].dtype)}
@@ -253,10 +273,11 @@ class ETLService:
             file_record.lineage_info = lineage
             
             # Audit log
+            anomaly_msg = f" Found {len(anomalies_detected)} anomalous columns." if anomalies_detected else ""
             audit = AuditLog(
                 user_id=file_record.owner_id,
                 action="FILE_CLEANED",
-                details=f"ETL completed for File ID {file_id}. Loaded {total_rows} rows into table {dynamic_table_name}.",
+                details=f"ETL completed for File ID {file_id}. Loaded {total_rows} rows into table {dynamic_table_name}.{anomaly_msg}",
                 lineage_step="AI_CLEANED"
             )
             db.add(audit)
@@ -274,7 +295,8 @@ class ETLService:
                 "table_name": dynamic_table_name,
                 "rows_inserted": total_rows,
                 "duplicates": duplicate_count,
-                "nulls": null_count
+                "nulls": null_count,
+                "anomalies": anomalies_detected
             }
 
         except Exception as e:
@@ -305,7 +327,7 @@ class ETLService:
             raise e
 
     async def check_rules_on_table(self, table_name: str, db: AsyncSession):
-        """Query active rules, check conditions on the table, and trigger alerts/webhooks."""
+        """Query active rules, check conditions (standard & statistical anomaly) on the table, and trigger alerts/webhooks."""
         from app.models.rules import AlertRule
         from app.models.audit_logs import AuditLog
         from sqlalchemy.future import select
@@ -323,25 +345,55 @@ class ETLService:
             active_rules = result.scalars().all()
             
             for rule in active_rules:
-                # Security Operator Check to prevent SQL injection
-                allowed_operators = ["<", ">", "==", "!=", "<=", ">="]
+                allowed_operators = ["<", ">", "==", "!=", "<=", ">=", "ANOMALY", "Z_SCORE"]
                 if rule.operator not in allowed_operators:
                     continue
-                sql_op = "=" if rule.operator == "==" else rule.operator
                 
-                # Dynamic SQL check query
-                check_sql = f'SELECT COUNT(*) FROM {table_name} WHERE "{rule.condition_col}" {sql_op} :val'
+                is_anomaly = rule.operator in ["ANOMALY", "Z_SCORE"] or rule.rule_type == "ANOMALY"
                 
-                try:
-                    res = await db.execute(text(check_sql), {"val": rule.value})
-                    count = res.scalar() or 0
-                except Exception:
-                    # Column doesn't exist in this file, skip this rule
-                    continue
-                
-                if count > 0:
-                    # Rule Triggered!
+                if is_anomaly:
+                    # Statistical Z-Score Anomaly Detection
+                    try:
+                        threshold = float(rule.value) if rule.value else 3.0
+                    except ValueError:
+                        threshold = 3.0
+                    
+                    check_sql = f"""
+                    WITH stats AS (
+                        SELECT 
+                            AVG(CAST("{rule.condition_col}" AS DOUBLE PRECISION)) as mean_val,
+                            STDDEV_SAMP(CAST("{rule.condition_col}" AS DOUBLE PRECISION)) as std_val
+                        FROM {table_name}
+                        WHERE "{rule.condition_col}" IS NOT NULL
+                    )
+                    SELECT COUNT(*)
+                    FROM {table_name}, stats
+                    WHERE stats.std_val > 0
+                      AND (ABS(CAST("{rule.condition_col}" AS DOUBLE PRECISION) - stats.mean_val) / stats.std_val) >= :threshold
+                    """
+                    try:
+                        res = await db.execute(text(check_sql), {"threshold": threshold})
+                        count = res.scalar() or 0
+                    except Exception:
+                        continue
+                        
+                    details_str = (
+                        f"🚨 Statistical Anomaly Detected! Rule '{rule.name}' on table '{table_name}': "
+                        f"Found {count} statistical outlier(s) in column '{rule.condition_col}' (Z-Score >= {threshold}σ)."
+                    )
+                    condition_label = f"Z-Score({rule.condition_col}) >= {threshold}σ"
+                else:
+                    # Standard comparative threshold check
+                    sql_op = "=" if rule.operator == "==" else rule.operator
+                    check_sql = f'SELECT COUNT(*) FROM {table_name} WHERE "{rule.condition_col}" {sql_op} :val'
+                    try:
+                        res = await db.execute(text(check_sql), {"val": rule.value})
+                        count = res.scalar() or 0
+                    except Exception:
+                        continue
+                        
                     details_str = f"Rule '{rule.name}' triggered on table '{table_name}'. Found {count} matching records (Condition: {rule.condition_col} {rule.operator} {rule.value})."
+                    condition_label = f"IF {rule.condition_col} {rule.operator} {rule.value}"
                     
                     # Log in Audit Logs (displayed in Live Feed on Dashboard)
                     trigger_audit = AuditLog(
