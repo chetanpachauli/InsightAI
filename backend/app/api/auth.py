@@ -36,12 +36,15 @@ async def register(request: Request, user_in: UserCreate, db: AsyncSession = Dep
             detail="A user with this email already exists."
         )
     
+    from datetime import datetime
+    
     # Create new user record
     new_user = User(
         email=user_in.email,
         hashed_password=hash_password(user_in.password),
         role=user_in.role,
-        is_active=True
+        is_active=True,
+        created_at=datetime.utcnow()
     )
     db.add(new_user)
     await db.commit()
