@@ -28,6 +28,9 @@ limiter = Limiter(
 LOGIN_RATE_LIMIT = "5/minute"       # brute-force guard
 REGISTER_RATE_LIMIT = "3/hour"      # mass account-creation guard
 GENERAL_RATE_LIMIT = "120/minute"   # normal API traffic
+AI_RATE_LIMIT = "30/minute"         # Gemini-backed endpoints (cost/abuse guard)
+SCRAPER_RATE_LIMIT = "10/minute"    # External scrape + LLM extract
+UPLOAD_RATE_LIMIT = "20/minute"     # File / document / finance uploads
 
 
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):

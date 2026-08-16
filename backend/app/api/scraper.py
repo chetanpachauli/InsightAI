@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.api.deps import get_current_user
@@ -8,6 +8,7 @@ from app.models.audit_logs import AuditLog
 from app.services.gemini_service import gemini_service
 from app.api.files import run_etl_task
 from app.core.config import settings
+from app.core.rate_limit import limiter, SCRAPER_RATE_LIMIT
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import httpx
@@ -47,7 +48,9 @@ def is_blocked_ssrf_target(url: str) -> bool:
     return False
 
 @router.post("/extract", status_code=status.HTTP_200_OK)
+@limiter.limit(SCRAPER_RATE_LIMIT)
 async def extract_website_data(
+    request: Request,
     req: ScrapeRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),

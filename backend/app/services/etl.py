@@ -349,7 +349,15 @@ class ETLService:
                 if rule.operator not in allowed_operators:
                     continue
                 
+                # SQL injection protection: validate condition_col identifier
+                if not re.match(r'^[a-zA-Z0-9_]+$', rule.condition_col):
+                    print(f"Invalid column format in rule {rule.id}: {rule.condition_col}")
+                    continue
+                
                 is_anomaly = rule.operator in ["ANOMALY", "Z_SCORE"] or rule.rule_type == "ANOMALY"
+                count = 0
+                details_str = ""
+                condition_label = ""
                 
                 if is_anomaly:
                     # Statistical Z-Score Anomaly Detection
@@ -395,6 +403,8 @@ class ETLService:
                     details_str = f"Rule '{rule.name}' triggered on table '{table_name}'. Found {count} matching records (Condition: {rule.condition_col} {rule.operator} {rule.value})."
                     condition_label = f"IF {rule.condition_col} {rule.operator} {rule.value}"
                     
+                if count > 0:
+                    # Rule Triggered!
                     # Log in Audit Logs (displayed in Live Feed on Dashboard)
                     trigger_audit = AuditLog(
                         user_id=rule.owner_id,
@@ -407,35 +417,32 @@ class ETLService:
                     
                     # If webhook is configured
                     if rule.action_type == "WEBHOOK" and rule.webhook_url:
-                        # Construct a rich Slack/Discord Block Kit message payload
-                        payload = {
-                            "text": f"🚨 *InsightAI Alert: Rule Triggered!*",
-                            "attachments": [
-                                {
-                                    "color": "#ef4444", # Red theme
-                                    "title": f"Trigger Rule: {rule.name}",
-                                    "text": details_str,
-                                    "fields": [
-                                        {"title": "Table Source", "value": table_name, "short": True},
-                                        {"title": "Matching Rows", "value": str(count), "short": True}
-                                    ],
-                                    "footer": "InsightAI Platform Automated Engine"
-                                }
-                            ]
-                        }
-                        
-                        try:
-                            # Send webhook notification asynchronously
-                            async with httpx.AsyncClient() as client:
-                                await client.post(rule.webhook_url, json=payload, timeout=5.0)
-                        except Exception as webhook_err:
-                            print(f"Failed to deliver webhook alert: {str(webhook_err)}")
-                            
+                        # SSRF Protection: block local and internal loopback/private destinations
+                        wh = rule.webhook_url.lower()
+                        is_ssrf = any(h in wh for h in ["localhost", "127.0.0.1", "0.0.0.0", "169.254.", "10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31."])
+                        if not is_ssrf and (wh.startswith("https://") or wh.startswith("http://")):
+                            payload = {
+                                "text": f"🚨 *InsightAI Alert: Rule Triggered!*",
+                                "attachments": [
+                                    {
+                                        "color": "#ef4444",
+                                        "title": f"Trigger Rule: {rule.name}",
+                                        "text": details_str,
+                                        "fields": [
+                                            {"title": "Table Source", "value": table_name, "short": True},
+                                            {"title": "Matching Rows", "value": str(count), "short": True}
+                                        ],
+                                        "footer": "InsightAI Platform Automated Engine"
+                                    }
+                                ]
+                            }
+                            from app.services.notification_service import notification_service
+                            notification_service.dispatch_webhook_alert(rule.webhook_url, payload)
+
                     elif rule.action_type == "EMAIL" and rule.recipient:
                         from app.services.notification_service import notification_service
                         subject = f"🚨 InsightAI Alert: Rule '{rule.name}' Triggered"
-                        condition_label = f"IF {rule.condition_col} {rule.operator} {rule.value}"
-                        notification_service.send_email_notification(
+                        notification_service.dispatch_email_alert(
                             recipient=rule.recipient,
                             subject=subject,
                             rule_name=rule.name,
@@ -450,11 +457,11 @@ class ETLService:
                             f"🚨 *InsightAI Enterprise Alert!* 🚨\n\n"
                             f"*Rule Name:* {rule.name}\n"
                             f"*Source Sheet:* {table_name}\n"
-                            f"*Condition:* IF {rule.condition_col} {rule.operator} {rule.value}\n"
+                            f"*Condition:* {condition_label}\n"
                             f"*Matching Anomalies:* {count} records matched!\n\n"
                             f"ℹ️ *Action Required:* Please login to your InsightAI Dashboard to take immediate action."
                         )
-                        notification_service.send_whatsapp_notification(
+                        notification_service.dispatch_whatsapp_alert(
                             recipient=rule.recipient,
                             message=whatsapp_body
                         )

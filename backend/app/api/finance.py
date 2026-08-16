@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from app.core.database import get_db, SessionLocal
@@ -7,6 +7,7 @@ from app.models.users import User
 from app.models.audit_logs import AuditLog
 from app.services.gemini_service import gemini_service
 from app.core.config import settings
+from app.core.rate_limit import limiter, AI_RATE_LIMIT, UPLOAD_RATE_LIMIT
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 import polars as pl
@@ -22,7 +23,9 @@ class ReclassifyRequest(BaseModel):
     new_category: str
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
+@limiter.limit(UPLOAD_RATE_LIMIT)
 async def upload_bank_statement(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)

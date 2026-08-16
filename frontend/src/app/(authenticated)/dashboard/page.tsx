@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Sidebar from "@/components/Sidebar";
 import api from "@/lib/api";
 import { 
   FileText, 
@@ -109,24 +108,16 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-        <Sidebar />
-        <main className="flex-1 p-8 overflow-y-auto">
-          <div className="flex flex-col items-center justify-center py-40">
-            <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-            <p className="text-slate-400 text-sm">Assembling analytics workspace...</p>
-            <p className="text-slate-500 text-xs mt-1">Running database aggregations & Gemini AI reports</p>
-          </div>
-        </main>
+      <div className="flex flex-col items-center justify-center py-40">
+        <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
+        <p className="text-slate-400 text-sm">Assembling analytics workspace...</p>
+        <p className="text-slate-500 text-xs mt-1">Running database aggregations & Gemini AI reports</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-      <Sidebar />
-
-      <main className="flex-1 p-8 overflow-y-auto">
+    <>
         {/* Top welcome profile bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-slate-900">
           <div>
@@ -350,7 +341,6 @@ export default function DashboardPage() {
             </div>
 
           </div>
-      </main>
-    </div>
+    </>
   );
 }

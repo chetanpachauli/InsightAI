@@ -1,14 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import text, func
 from app.core.database import get_db
+from app.core.rate_limit import limiter, AI_RATE_LIMIT, GENERAL_RATE_LIMIT
 from app.api.deps import get_current_user
 from app.models.users import User
 from app.models.files import UploadedFile
 from app.models.audit_logs import AuditLog
 from app.models.rules import AlertRule
 from app.services.gemini_service import gemini_service
+from app.core.config import settings
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import json
@@ -24,7 +26,9 @@ class RawTableRequest(BaseModel):
     table_name: str
 
 @router.post("/chat")
+@limiter.limit(AI_RATE_LIMIT)
 async def chat_with_data(
+    request: Request,
     query_in: ChatQueryRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -170,7 +174,9 @@ async def chat_with_data(
         )
 
 @router.post("/raw-data")
+@limiter.limit(GENERAL_RATE_LIMIT)
 async def get_raw_table_data(
+    request: Request,
     req: RawTableRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -249,7 +255,9 @@ async def get_raw_table_data(
     }
 
 @router.get("/insights")
+@limiter.limit(AI_RATE_LIMIT)
 async def get_executive_insights(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -311,11 +319,28 @@ async def get_executive_insights(
             "missing_cells": metrics.get("missing_cells_detected", 0)
         })
 
+    # Cache expensive Gemini insight generation. Key is derived from the
+    # underlying data fingerprint so fresh uploads naturally invalidate it.
+    from app.core.cache import cache_get_json, cache_set_json, cache_key
+    data_fingerprint = ",".join(
+        f"{m['filename']}:{m['version']}:{m['rows']}:{m['columns']}" for m in summary_metrics
+    )
+    cache_id = cache_key("insights", current_user.id, data_fingerprint)
+    cached = await cache_get_json(cache_id)
+    if cached is not None:
+        return cached
+
     # Call Gemini to write insights
     metrics_json_str = json.dumps(summary_metrics, indent=2)
     ai_insights = gemini_service.generate_insights(metrics_json_str)
-    
-    return ai_insights
+
+    insights_payload = {
+        "key_findings": ai_insights.key_findings,
+        "recommendations": ai_insights.recommendations,
+        "cached": False,
+    }
+    await cache_set_json(cache_id, insights_payload, settings.CACHE_TTL_INSIGHTS)
+    return insights_payload
 
 @router.get("/stats")
 async def get_dashboard_stats(

@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 
 // Default to local dev; production (Vercel) sets NEXT_PUBLIC_API_URL at build time
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -75,11 +75,21 @@ export function getApiError(err: unknown, fallback: string): string {
   return fallback;
 }
 
-const subscribeNoop = () => () => {};
+const subscribeStorage = (onStoreChange: () => void) => {
+  if (typeof window === "undefined") return () => {};
+  const handler = () => onStoreChange();
+  window.addEventListener("storage", handler);
+  // Same-tab updates (localStorage.setItem from this window) don't fire "storage"
+  window.addEventListener("insightai-storage", handler);
+  return () => {
+    window.removeEventListener("storage", handler);
+    window.removeEventListener("insightai-storage", handler);
+  };
+};
 
 export function useLocalStorage(key: string): string {
   return useSyncExternalStore(
-    subscribeNoop,
+    subscribeStorage,
     () => localStorage.getItem(key) ?? "",
     () => ""
   );

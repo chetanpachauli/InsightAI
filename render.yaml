@@ -38,6 +38,13 @@ services:
       # memory:// is acceptable for a single free instance)
       - key: RATE_LIMIT_STORAGE
         value: memory://
+      # Celery needs Redis. Render free tier has none, so keep async ETL inline
+      # here; the docker-compose setup (with Redis) enables the Celery worker.
+      - key: CELERY_ENABLED
+        value: "false"
+      # API version prefix (all routes are served under /api/v1)
+      - key: API_V1_STR
+        value: /api/v1
 
 databases:
   - name: insightai-db

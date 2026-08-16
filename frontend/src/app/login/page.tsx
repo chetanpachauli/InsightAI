@@ -48,6 +48,7 @@ export default function LoginPage() {
         localStorage.setItem("access_token", response.data.access_token);
         localStorage.setItem("user_email", response.data.email);
         localStorage.setItem("user_role", response.data.role);
+        window.dispatchEvent(new Event("insightai-storage"));
 
         // Redirect to main workspace
         router.push("/dashboard");

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Sidebar from "@/components/Sidebar";
 import api from "@/lib/api";
 import { Loader2, Table, SlidersHorizontal, Grid3X3, ArrowRight } from "lucide-react";
 
@@ -177,10 +176,7 @@ export default function PivotPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-      <Sidebar />
-
-      <main className="flex-1 p-8 overflow-y-auto">
+    <>
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
@@ -416,7 +412,6 @@ export default function PivotPage() {
           </div>
 
         </div>
-      </main>
-    </div>
+    </>
   );
 }

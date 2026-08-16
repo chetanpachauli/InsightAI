@@ -5,6 +5,34 @@ from typing import Optional
 from app.core.config import settings
 
 class NotificationService:
+    def dispatch_email_alert(self, recipient: str, subject: str, rule_name: str, table_name: str, condition: str, count: int) -> None:
+        """Queue an email alert via Celery when enabled; fall back to inline SMTP."""
+        if settings.CELERY_ENABLED:
+            from app.tasks.notification_tasks import send_email_alert_task
+            send_email_alert_task.delay(recipient, subject, rule_name, table_name, condition, count)
+            return
+        self.send_email_notification(recipient, subject, rule_name, table_name, condition, count)
+
+    def dispatch_whatsapp_alert(self, recipient: str, message: str) -> None:
+        """Queue a WhatsApp alert via Celery when enabled; fall back to inline Twilio."""
+        if settings.CELERY_ENABLED:
+            from app.tasks.notification_tasks import send_whatsapp_alert_task
+            send_whatsapp_alert_task.delay(recipient, message)
+            return
+        self.send_whatsapp_notification(recipient, message)
+
+    def dispatch_webhook_alert(self, webhook_url: str, payload: dict) -> None:
+        """Queue a webhook POST via Celery when enabled; fall back to inline httpx."""
+        if settings.CELERY_ENABLED:
+            from app.tasks.notification_tasks import send_webhook_alert_task
+            send_webhook_alert_task.delay(webhook_url, payload)
+            return
+        import httpx
+        try:
+            httpx.post(webhook_url, json=payload, timeout=5.0)
+        except Exception as err:
+            print(f"Failed to deliver webhook alert: {str(err)}")
+
     def send_email_notification(self, recipient: str, subject: str, rule_name: str, table_name: str, condition: str, count: int) -> bool:
         """Send formatted HTML alert email. Falls back to mock logs if SMTP keys are absent."""
         if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
@@ -111,6 +139,14 @@ class NotificationService:
         except Exception as err:
             print(f"[Notification Failed] Error sending Twilio WhatsApp to {recipient}: {str(err)}")
             return False
+
+    def dispatch_generic_email(self, recipient: str, subject: str, message: str) -> None:
+        """Queue a generic email via Celery when enabled; fall back to inline SMTP."""
+        if settings.CELERY_ENABLED:
+            from app.tasks.notification_tasks import send_generic_email_task
+            send_generic_email_task.delay(recipient, subject, message)
+            return
+        self.send_generic_email(recipient, subject, message)
 
     def send_generic_email(self, recipient: str, subject: str, message: str) -> bool:
         """Send a generic HTML formatted email. Falls back to mock logs if SMTP keys are absent."""

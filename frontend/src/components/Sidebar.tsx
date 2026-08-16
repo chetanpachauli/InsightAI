@@ -44,6 +44,7 @@ export default function Sidebar() {
     localStorage.removeItem("access_token");
     localStorage.removeItem("user_email");
     localStorage.removeItem("user_role");
+    window.dispatchEvent(new Event("insightai-storage"));
     router.push("/login");
   };
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import text
@@ -9,6 +9,7 @@ from app.models.files import UploadedFile
 from app.models.audit_logs import AuditLog
 from app.api.schemas import FileOut
 from app.core.config import settings
+from app.core.rate_limit import limiter, UPLOAD_RATE_LIMIT
 import os
 from datetime import datetime
 from typing import List
@@ -19,13 +20,19 @@ router = APIRouter(prefix="/files", tags=["File & Upload Management"])
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
 async def run_etl_task(file_id: int):
-    """Background task to run Polars ETL pipeline using a dedicated session."""
+    """Dispatch ETL to the Celery worker when enabled; otherwise run inline."""
+    if settings.CELERY_ENABLED:
+        from app.tasks.etl_tasks import process_file_etl_task
+        process_file_etl_task.delay(file_id)
+        return
     from app.services.etl import etl_service
     async with SessionLocal() as session:
         await etl_service.process_file_etl(file_id, session)
 
 @router.post("/upload", response_model=FileOut, status_code=status.HTTP_201_CREATED)
+@limiter.limit(UPLOAD_RATE_LIMIT)
 async def upload_file(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     current_user: User = Depends(RoleChecker(allowed_roles=["Admin", "MIS"])),

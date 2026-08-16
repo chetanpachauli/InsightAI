@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.core.database import get_db
@@ -7,6 +7,7 @@ from app.models.users import User
 from app.models.documents import DocumentChunk
 from app.models.audit_logs import AuditLog
 from app.services.gemini_service import gemini_service
+from app.core.rate_limit import limiter, AI_RATE_LIMIT, UPLOAD_RATE_LIMIT
 from google.genai import types
 from pydantic import BaseModel
 from typing import List, Optional
@@ -46,7 +47,9 @@ def generate_embedding(text: str) -> List[float]:
         raise RuntimeError(f"Error calling Gemini Embedding API: {str(e)}")
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
+@limiter.limit(UPLOAD_RATE_LIMIT)
 async def upload_document(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(RoleChecker(allowed_roles=["Admin", "MIS"])),
     db: AsyncSession = Depends(get_db)
@@ -118,7 +121,9 @@ async def upload_document(
         )
 
 @router.post("/query")
+@limiter.limit(AI_RATE_LIMIT)
 async def query_knowledge_base(
+    request: Request,
     query_in: DocQueryRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)

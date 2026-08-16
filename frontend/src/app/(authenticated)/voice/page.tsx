@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Sidebar from "@/components/Sidebar";
 import { useRouter } from "next/navigation";
 import { 
   Mic, 
@@ -380,26 +379,20 @@ export default function VoiceAssistantPage() {
 
   if (!browserSupport) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-        <Sidebar />
-        <main className="flex-1 p-8 flex items-center justify-center">
-          <div className="text-center max-w-md">
-            <MicOff className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-slate-200 mb-2">Browser Support Nahi Hai</h2>
-            <p className="text-slate-400 text-sm">
-              Chrome, Edge, ya Safari use karo.
-            </p>
-          </div>
-        </main>
+      <div className="flex items-center justify-center py-40">
+        <div className="text-center max-w-md">
+          <MicOff className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-slate-200 mb-2">Browser Support Nahi Hai</h2>
+          <p className="text-slate-400 text-sm">
+            Chrome, Edge, ya Safari use karo.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-      <Sidebar />
-
-      <main className="flex-1 p-8 overflow-y-auto">
+    <>
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -733,7 +726,6 @@ export default function VoiceAssistantPage() {
           </div>
 
         </div>
-      </main>
-    </div>
+    </>
   );
 }

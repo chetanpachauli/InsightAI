@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Sidebar from "@/components/Sidebar";
 import api, { getApiError } from "@/lib/api";
 import { 
   BookOpen, 
@@ -83,10 +82,7 @@ export default function DocumentHubPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-      <Sidebar />
-
-      <main className="flex-1 p-8 overflow-y-auto">
+    <>
         {/* Top Header */}
         <div className="mb-8 border-b border-slate-900 pb-6">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
@@ -241,7 +237,6 @@ export default function DocumentHubPage() {
           </div>
 
         </div>
-      </main>
-    </div>
+    </>
   );
 }

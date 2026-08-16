@@ -50,6 +50,10 @@ services:
       - REDIS_URL=redis://redis:6379/0
       # Rate-limit counters shared across instances via Redis
       - RATE_LIMIT_STORAGE=redis://redis:6379/0
+      # Async ETL + notification delivery via Celery worker
+      - CELERY_ENABLED=true
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
       # Named volume so uploaded files persist across container restarts
       - upload_data:/workspace/uploads
@@ -58,6 +62,32 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  # 4. Celery Worker (async ETL + notification delivery)
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: insightai_worker
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-insightai}
+      - REDIS_URL=redis://redis:6379/0
+      - RATE_LIMIT_STORAGE=redis://redis:6379/0
+      - CELERY_ENABLED=true
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - upload_data:/workspace/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Override the web entrypoint: run the Celery worker instead of uvicorn.
+    entrypoint: ["celery", "-A", "app.core.celery_app:celery_app", "worker", "--loglevel=info"]
 
 volumes:
   postgres_data:

@@ -153,7 +153,7 @@ def main():
     print("   • Option A: Create PostgreSQL on Render")
     print("   • Option B: Use Neon.tech (free tier)")
     print("\n4. ✅ Test Deployment:")
-    print("   • Check health: https://[your-backend].onrender.com/api/health")
+    print("   • Check health: https://[your-backend].onrender.com/health")
     print("   • Check docs: https://[your-backend].onrender.com/docs")
     print("\n5. 🔗 Connect Frontend:")
     print("   • Frontend is already live: https://frontend-nine-woad-19.vercel.app")

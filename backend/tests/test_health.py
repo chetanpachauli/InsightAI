@@ -27,7 +27,7 @@ class TestErrorEnvelope:
 
     def test_validation_error_returns_422_envelope(self, client):
         resp = client.post(
-            "/api/auth/register",
+            "/api/v1/auth/register",
             json={"email": "bad", "password": "short", "role": "Employee"},
         )
         assert resp.status_code == 422

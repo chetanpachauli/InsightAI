@@ -45,7 +45,6 @@ async def send_manual_notification(
                 recipient=req_in.recipient,
                 message=req_in.message
             )
-
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

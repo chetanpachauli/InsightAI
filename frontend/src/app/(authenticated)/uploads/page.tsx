@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Sidebar from "@/components/Sidebar";
 import api, { getApiError, useLocalStorage } from "@/lib/api";
 import { 
   UploadCloud, 
@@ -140,10 +139,7 @@ export default function UploadsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-      <Sidebar />
-
-      <main className="flex-1 p-8 overflow-y-auto">
+    <>
         {/* Top Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -390,7 +386,6 @@ export default function UploadsPage() {
           </div>
 
         </div>
-      </main>
-    </div>
+    </>
   );
 }

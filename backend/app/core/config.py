@@ -4,7 +4,7 @@ from typing import Optional, List
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "InsightAI MIS & AI Analytics Platform"
-    API_V1_STR: str = "/api"
+    API_V1_STR: str = "/api/v1"
     
     # Database Configuration
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/insightai"
@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     # Rate-limit counter storage: "memory://" (dev/single instance) or a Redis URL (production)
     RATE_LIMIT_STORAGE: str = "memory://"
+    # Enable the Celery worker for async ETL + notifications. Set to "true" in
+    # production (docker-compose / Render with Redis). When disabled, ETL and
+    # notifications run inline so the app works without a broker.
+    CELERY_ENABLED: bool = False
+    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
+    # TTL (seconds) for cached expensive responses (AI insights, etc.)
+    CACHE_TTL_INSIGHTS: int = 300
     
     # AI API Keys
     GEMINI_API_KEY: Optional[str] = None

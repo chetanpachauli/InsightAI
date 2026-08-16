@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Sidebar from "@/components/Sidebar";
 import api, { getApiError } from "@/lib/api";
 import { 
   TrendingUp, 
@@ -149,10 +148,7 @@ export default function FinancePage() {
   const netSavings = stats ? (stats.total_credit - stats.total_debit) : 0;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-      <Sidebar />
-
-      <main className="flex-1 p-8 overflow-y-auto">
+    <>
         {/* Header */}
         <div className="mb-8 border-b border-slate-900 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -421,7 +417,6 @@ export default function FinancePage() {
           </div>
         )}
 
-      </main>
-    </div>
+    </>
   );
 }

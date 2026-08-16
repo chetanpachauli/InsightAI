@@ -85,13 +85,13 @@ def db_session():
 
 def register_user(client, email: str, password: str = "Test@1234", role: str = "Employee"):
     return client.post(
-        "/api/auth/register",
+        "/api/v1/auth/register",
         json={"email": email, "password": password, "role": role},
     )
 
 
 def login_user(client, email: str, password: str = "Test@1234"):
-    return client.post("/api/auth/login", json={"email": email, "password": password})
+    return client.post("/api/v1/auth/login", json={"email": email, "password": password})
 
 
 def create_user_and_login(client, email: str, role: str = "Employee", password: str = "Test@1234"):
