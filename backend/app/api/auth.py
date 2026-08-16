@@ -50,7 +50,13 @@ async def register(request: Request, user_in: UserCreate, db: AsyncSession = Dep
     await db.commit()
     await db.refresh(new_user)
     
-    return new_user
+    return {
+        "id": new_user.id,
+        "email": new_user.email,
+        "role": new_user.role,
+        "is_active": new_user.is_active,
+        "created_at": new_user.created_at
+    }
 
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit(LOGIN_RATE_LIMIT)
