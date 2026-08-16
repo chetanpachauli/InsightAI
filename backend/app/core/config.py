@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_jwt_secret(cls, v: str) -> str:
         # Reject the old insecure hardcoded placeholder
-        if not v or "supersecretkey" in v.lower():
+        if not v or "supersecretkey" in v.lower() or "replace_with" in v.lower():
             raise ValueError(
                 "JWT_SECRET_KEY must be set to a strong random value in your .env file."
             )

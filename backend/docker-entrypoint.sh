@@ -6,4 +6,5 @@ echo "[entrypoint] Running database migrations..."
 alembic upgrade head
 
 echo "[entrypoint] Starting uvicorn..."
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Bind to $PORT when provided (Render injects PORT=10000), default 8000 for local Docker
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"

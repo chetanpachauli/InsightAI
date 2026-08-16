@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import json
 import re
+from datetime import datetime
 
 router = APIRouter(prefix="/query", tags=["AI Analytics & Querying"])
 
@@ -408,7 +409,7 @@ async def get_export_summary(
         "report_title": "InsightAI Enterprise Intelligence Report",
         "generated_by": current_user.email,
         "role": current_user.role,
-        "generated_at": func.now(),
+        "generated_at": datetime.utcnow().isoformat(),
         "summary": {
             "total_files": len(all_files),
             "approved_files": len([f for f in all_files if f.workflow_status == "APPROVED"]),

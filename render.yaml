@@ -6,7 +6,7 @@ services:
     dockerfilePath: backend/Dockerfile
     dockerContext: backend
     plan: free
-    healthCheckPath: /
+    healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -26,6 +26,18 @@ services:
         sync: false
       - key: UPLOAD_DIR
         value: uploads
+      - key: AUTO_CREATE_TABLES
+        value: "false"
+      # Must match the deployed frontend origin (Vercel/Netlify)
+      - key: CORS_ORIGINS
+        value: https://frontend-nine-woad-19.vercel.app
+      # Mark refresh-token cookie Secure (HTTPS only)
+      - key: COOKIE_SECURE
+        value: "true"
+      # Rate-limit counters shared across instances (Render Redis requires paid tier;
+      # memory:// is acceptable for a single free instance)
+      - key: RATE_LIMIT_STORAGE
+        value: memory://
 
 databases:
   - name: insightai-db

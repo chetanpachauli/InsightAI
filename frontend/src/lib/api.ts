@@ -1,7 +1,9 @@
 import axios from "axios";
 import { useSyncExternalStore } from "react";
 
-const API_BASE_URL = "http://localhost:8000/api";
+// Default to local dev; production (Vercel) sets NEXT_PUBLIC_API_URL at build time
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,

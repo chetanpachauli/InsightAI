@@ -28,6 +28,8 @@ db_data/
 uploads/*
 !uploads/.gitkeep
 backend/uploads/*
+backend/test_run.db
+backend/test.db
 
 # System & OS Files
 .DS_Store

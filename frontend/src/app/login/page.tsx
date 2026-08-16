@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { TrendingUp, Mail, Lock, Shield, ArrowRight } from "lucide-react";
 import axios from "axios";
-import { getApiError } from "@/lib/api";
+import { getApiError, API_BASE_URL } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,7 +22,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const baseUrl = "http://localhost:8000/api";
+    const baseUrl = API_BASE_URL;
 
     try {
       if (isRegister) {

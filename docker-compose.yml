@@ -8,18 +8,31 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-insightai}
+    # Bind to localhost only: the DB must NOT be exposed to the public internet.
+    # Only the backend container reaches it over the internal network.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-insightai}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   # 2. Redis Caching & Queue Broker Service
   redis:
     image: redis:7-alpine
     container_name: insightai_redis
     restart: always
+    # Bind to localhost only (internal network is enough for the backend)
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   # 3. FastAPI Python Backend Service
   web:
@@ -35,12 +48,17 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-insightai}
       - REDIS_URL=redis://redis:6379/0
+      # Rate-limit counters shared across instances via Redis
+      - RATE_LIMIT_STORAGE=redis://redis:6379/0
     volumes:
-      - ./backend:/workspace
-      - ./uploads:/workspace/uploads
+      # Named volume so uploaded files persist across container restarts
+      - upload_data:/workspace/uploads
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:
+  upload_data:
