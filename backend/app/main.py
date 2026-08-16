@@ -100,6 +100,26 @@ def read_root():
     return {"message": f"Welcome to {settings.PROJECT_NAME} Backend API!"}
 
 @app.get("/health")
-def health_check():
-    """Liveness probe for load balancers / orchestrators."""
-    return {"status": "healthy"}
+async def health_check():
+    """Enterprise deep health check: verifies API, Database connectivity, and AI services."""
+    from sqlalchemy import text
+    from app.core.database import SessionLocal
+    from datetime import datetime, timezone
+
+    db_status = "connected"
+    try:
+        async with SessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+    except Exception as e:
+        db_status = f"degraded: {str(e)}"
+
+    is_healthy = "degraded" not in db_status
+    return {
+        "status": "healthy" if is_healthy else "degraded",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "services": {
+            "database": db_status,
+            "gemini_ai": "configured" if settings.GEMINI_API_KEY else "unconfigured",
+            "rate_limiter": settings.RATE_LIMIT_STORAGE
+        }
+    }
