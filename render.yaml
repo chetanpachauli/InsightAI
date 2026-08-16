@@ -2,24 +2,20 @@ services:
   # 1. FastAPI Backend (Web Service)
   - type: web
     name: insightai-backend
-    env: docker
-    dockerfilePath: Dockerfile
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
     dockerContext: backend
     plan: free
+    healthCheckPath: /
     envVars:
       - key: DATABASE_URL
         fromDatabase:
           name: insightai-db
           property: connectionString
-      - key: REDIS_URL
-        fromService:
-          name: insightai-redis
-          type: redis
-          property: connectionString
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: GEMINI_API_KEY
-        sync: false # Set in Render UI dashboard
+        sync: false
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASSWORD
@@ -31,45 +27,8 @@ services:
       - key: UPLOAD_DIR
         value: uploads
 
-  # 2. Celery Worker (Background Processing)
-  - type: worker
-    name: insightai-worker
-    env: docker
-    dockerfilePath: Dockerfile
-    dockerContext: backend
-    plan: free
-    dockerCommand: celery -A app.core.celery_app worker --loglevel=info
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: insightai-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          name: insightai-redis
-          type: redis
-          property: connectionString
-      - key: JWT_SECRET_KEY
-        fromService:
-          name: insightai-backend
-          type: web
-          property: envVar:JWT_SECRET_KEY
-      - key: GEMINI_API_KEY
-        fromService:
-          name: insightai-backend
-          type: web
-          property: envVar:GEMINI_API_KEY
-      - key: UPLOAD_DIR
-        value: uploads
-
-# 3. Redis Instance
 databases:
   - name: insightai-db
     plan: free
     databaseName: insightai
-
-# 4. Redis Service
-redis:
-  - name: insightai-redis
-    plan: free
-    ipAllowList: [] # Private access inside project
+    user: postgres
