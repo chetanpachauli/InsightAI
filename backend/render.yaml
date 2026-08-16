@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: insightai-backend
+    env: python
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://frontend-nine-woad-19.vercel.app
+      - key: ENVIRONMENT
+        value: production
+      - key: DB_ECHO
+        value: "false"
+      - key: AUTO_CREATE_TABLES
+        value: "false"
