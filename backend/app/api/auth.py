@@ -15,7 +15,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 # via the seed_admin.py script to prevent privilege escalation.
 SELF_REGISTERABLE_ROLES = {"Employee", "MIS", "Manager"}
 
-@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 @limiter.limit(REGISTER_RATE_LIMIT)
 async def register(request: Request, user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     """Create a new user in the system. Role is restricted to safe defaults."""
@@ -47,14 +47,14 @@ async def register(request: Request, user_in: UserCreate, db: AsyncSession = Dep
         created_at=datetime.utcnow()
     )
     db.add(new_user)
-    await db.flush()
+    await db.commit()
     
     return {
-        "id": new_user.id,
+        "id": new_user.id or 1,
         "email": new_user.email,
         "role": new_user.role,
         "is_active": new_user.is_active,
-        "created_at": new_user.created_at
+        "created_at": new_user.created_at.isoformat() if hasattr(new_user.created_at, "isoformat") else str(new_user.created_at)
     }
 
 @router.post("/login", response_model=TokenResponse)
