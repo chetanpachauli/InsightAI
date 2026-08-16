@@ -1,5 +1,7 @@
 # InsightAI: Enterprise MIS & AI Analytics SaaS Platform
 
+[![Deploy to Render](https://render.com/images/deploy-to-render.svg)](https://render.com/deploy?repo=https://github.com/chetanpachauli/InsightAI)
+
 InsightAI is a high-performance full-stack data analytics and continuous integration platform designed for modern business operations. It automates Excel/CSV ingestion, offers role-based approval workflows, dynamic pivot-table reports, vector RAG document searches, manual message dispatches (Email & WhatsApp), and local Jenkins CI/CD pipelines.
 
 ---
