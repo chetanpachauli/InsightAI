@@ -47,8 +47,7 @@ async def register(request: Request, user_in: UserCreate, db: AsyncSession = Dep
         created_at=datetime.utcnow()
     )
     db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
+    await db.flush()
     
     return {
         "id": new_user.id,
