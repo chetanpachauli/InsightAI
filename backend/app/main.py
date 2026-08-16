@@ -46,14 +46,14 @@ from app.api.scraper import router as scraper_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Apply schema if running in dev mode without migrations.
-    # In production set AUTO_CREATE_TABLES=false and run `alembic upgrade head`.
-    if settings.AUTO_CREATE_TABLES:
+    # Ensure all tables exist in database on startup
+    try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        print("Database tables created successfully!")
+        logger.info("Database tables initialized successfully.")
+    except Exception as e:
+        logger.warning(f"Database table initialization warning: {e}")
     yield
-    # Shutdown: Cleanup (if needed)
     print("Application shutdown")
 
 app = FastAPI(
