@@ -30,8 +30,10 @@ jobs:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
           JWT_SECRET_KEY: test_secret_key_for_ci_pipeline_only
         run: |
-          # Pytest execution
           cd backend
+          # Diagnostics: print python version and test app import
+          python --version
+          python -c "import sys, os; sys.path.insert(0, os.getcwd()); from app.main import app; print('App imported successfully!')"
           python -m pytest
 
   # Job 2: Test & Build Frontend (Next.js)
