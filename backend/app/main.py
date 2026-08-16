@@ -74,12 +74,10 @@ app.add_middleware(RequestContextMiddleware)
 app.add_middleware(SlowAPIMiddleware)
 
 # Set up CORS middleware to allow React (Next.js) to communicate with FastAPI
-# Origins are restricted to the configured frontend URLs (see CORS_ORIGINS in .env).
-# A wildcard origin ("*") combined with credentials is rejected by browsers, so we
-# always use an explicit allowlist.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
