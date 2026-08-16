@@ -367,3 +367,55 @@ async def get_dashboard_stats(
         ]
     }
 
+@router.get("/export/summary")
+async def get_export_summary(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Dedicated enterprise endpoint for compiling complete system status,
+    statistical metrics, anomaly lineage logs, and AI executive summaries.
+    """
+    # 1. Fetch file records
+    files_result = await db.execute(
+        select(UploadedFile).where(UploadedFile.status == "COMPLETED")
+    )
+    all_files = files_result.scalars().all()
+    
+    table_summaries = []
+    total_anomalies_count = 0
+    for f in all_files:
+        lineage = f.lineage_info or {}
+        metrics = lineage.get("metrics", {})
+        anomalies = metrics.get("statistical_anomalies", [])
+        total_anomalies_count += sum(a.get("outlier_count", 0) for a in anomalies if isinstance(a, dict))
+        table_summaries.append({
+            "filename": f.filename,
+            "version": f.version,
+            "status": f.workflow_status,
+            "total_rows": metrics.get("total_rows", 0),
+            "total_columns": metrics.get("total_columns", 0),
+            "duplicate_rows": metrics.get("duplicate_rows_detected", 0),
+            "missing_cells": metrics.get("missing_cells_detected", 0),
+            "anomalies_detected": anomalies
+        })
+
+    # 2. Fetch rules count
+    rules_result = await db.execute(select(func.count(AlertRule.id)).where(AlertRule.is_active == True))
+    total_active_rules = rules_result.scalar() or 0
+
+    return {
+        "report_title": "InsightAI Enterprise Intelligence Report",
+        "generated_by": current_user.email,
+        "role": current_user.role,
+        "generated_at": func.now(),
+        "summary": {
+            "total_files": len(all_files),
+            "approved_files": len([f for f in all_files if f.workflow_status == "APPROVED"]),
+            "active_alert_rules": total_active_rules,
+            "total_statistical_anomalies": total_anomalies_count
+        },
+        "datasets": table_summaries
+    }
+
+

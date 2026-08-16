@@ -333,10 +333,38 @@ export default function PivotPage() {
                 </div>
               ) : (
                 <div className="overflow-auto flex-1 max-h-[500px]">
-                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center space-x-2">
-                    <Table className="w-4.5 h-4.5 text-indigo-400" />
-                    <span>Pivoted Matrix Grid ({aggFunc} of {valueField})</span>
-                  </h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-2">
+                      <Table className="w-4.5 h-4.5 text-indigo-400" />
+                      <span>Pivoted Matrix Grid ({aggFunc} of {valueField})</span>
+                    </h3>
+
+                    <button
+                      onClick={() => {
+                        const csvRows = [
+                          [rowField, ...pivotHeaders, "Total"].map(h => `"${h}"`).join(","),
+                          ...pivotRows.map(row => [
+                            `"${row.rowLabel}"`,
+                            ...pivotHeaders.map(h => row[h] ?? 0),
+                            row.rowTotal
+                          ].join(",")),
+                          ["Grand Total", ...pivotHeaders.map(h => columnTotals[h] || 0), grandTotal].join(",")
+                        ];
+                        const blob = new Blob(["\uFEFF" + csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.setAttribute("href", url);
+                        link.setAttribute("download", `InsightAI_Pivot_${aggFunc}_${valueField}_${new Date().toISOString().split("T")[0]}.csv`);
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      className="flex items-center space-x-1.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-xl shadow transition"
+                    >
+                      <Table className="w-3.5 h-3.5" />
+                      <span>Export Matrix (.csv)</span>
+                    </button>
+                  </div>
                   
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
