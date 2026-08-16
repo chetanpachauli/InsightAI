@@ -31,4 +31,4 @@ databases:
   - name: insightai-db
     plan: free
     databaseName: insightai
-    user: postgres
+    user: insightai
