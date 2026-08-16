@@ -3,12 +3,29 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.core.logging_setup import setup_logging
+from app.core.logging_setup import setup_logging, get_logger
 from app.core.request_context import RequestContextMiddleware
 from app.core.exceptions import register_exception_handlers
+from app.core.rate_limit import limiter, rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 # Initialize structured (JSON) logging before anything else
 setup_logging()
+logger = get_logger("startup")
+
+# Initialize Sentry error monitoring (no-op when SENTRY_DSN is not configured)
+if settings.SENTRY_DSN:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.SENTRY_ENVIRONMENT,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        # Include user identity (id + email) in error reports when authenticated
+        send_default_pii=True,
+    )
+    logger.info("Sentry error monitoring initialized")
 
 # Import models to ensure they are registered with SQLAlchemy Base before creation
 from app.models.users import User
@@ -48,8 +65,13 @@ app = FastAPI(
 # Register global exception handlers (must be before adding middleware)
 register_exception_handlers(app)
 
+# Rate limiter state + handler (429 responses use the standard error envelope)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
 # Attach request correlation middleware (assigns X-Request-ID + structured logs)
 app.add_middleware(RequestContextMiddleware)
+app.add_middleware(SlowAPIMiddleware)
 
 # Set up CORS middleware to allow React (Next.js) to communicate with FastAPI
 # Origins are restricted to the configured frontend URLs (see CORS_ORIGINS in .env).
@@ -76,3 +98,8 @@ app.include_router(scraper_router, prefix=settings.API_V1_STR)
 @app.get("/")
 def read_root():
     return {"message": f"Welcome to {settings.PROJECT_NAME} Backend API!"}
+
+@app.get("/health")
+def health_check():
+    """Liveness probe for load balancers / orchestrators."""
+    return {"status": "healthy"}

@@ -26,3 +26,5 @@ beautifulsoup4==4.15.0
 aiosqlite==0.22.1
 alembic==1.19.1
 python-dotenv==1.2.2
+sentry-sdk==2.68.0
+slowapi==0.1.10

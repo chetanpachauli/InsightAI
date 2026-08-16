@@ -25,6 +25,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
+      - name: Run Ruff Lint Checks
+        run: |
+          pip install ruff
+          cd backend
+          # Pyflakes-level checks: undefined names, unused imports, syntax errors
+          ruff check app --select E9,F63,F7,F82
+
       - name: Run Backend Tests
         env:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
@@ -54,6 +61,11 @@ jobs:
         run: |
           cd frontend
           npm install
+
+      - name: TypeScript Type Check
+        run: |
+          cd frontend
+          npx tsc --noEmit
 
       - name: Compile & Build Next.js
         run: |

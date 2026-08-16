@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, verify_token
 from app.core.config import settings
+from app.core.rate_limit import limiter, LOGIN_RATE_LIMIT, REGISTER_RATE_LIMIT
 from app.models.users import User
 from app.api.schemas import UserCreate, UserLogin, TokenResponse, UserOut
 from typing import Optional
@@ -15,7 +16,8 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 SELF_REGISTERABLE_ROLES = {"Employee", "MIS", "Manager"}
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
+@limiter.limit(REGISTER_RATE_LIMIT)
+async def register(request: Request, user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     """Create a new user in the system. Role is restricted to safe defaults."""
     # Prevent privilege escalation: nobody can self-register as Admin/CEO
     if user_in.role not in SELF_REGISTERABLE_ROLES:
@@ -47,12 +49,14 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     return new_user
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit(LOGIN_RATE_LIMIT)
 async def login(
+    request: Request,
     user_in: UserLogin, 
     response: Response,
     db: AsyncSession = Depends(get_db)
 ):
-    """Authenticate credentials and return tokens."""
+    """Authenticate credentials and return tokens. Rate-limited to 5/min to prevent brute force."""
     result = await db.execute(select(User).where(User.email == user_in.email))
     user = result.scalars().first()
     

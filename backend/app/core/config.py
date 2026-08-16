@@ -26,9 +26,17 @@ class Settings(BaseSettings):
     
     # Redis & Celery
     REDIS_URL: str = "redis://localhost:6379/0"
+    # Rate-limit counter storage: "memory://" (dev/single instance) or a Redis URL (production)
+    RATE_LIMIT_STORAGE: str = "memory://"
     
     # AI API Keys
     GEMINI_API_KEY: Optional[str] = None
+
+    # Error Monitoring (Sentry). Leave empty to disable.
+    SENTRY_DSN: Optional[str] = None
+    # % of transactions sampled for performance tracing (0.0 - 1.0)
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+    SENTRY_ENVIRONMENT: str = "production"
     
     # Uploads Storage
     UPLOAD_DIR: str = "uploads"

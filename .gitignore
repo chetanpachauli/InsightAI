@@ -27,6 +27,7 @@ pip-delete-this-directory.txt
 db_data/
 uploads/*
 !uploads/.gitkeep
+backend/uploads/*
 
 # System & OS Files
 .DS_Store

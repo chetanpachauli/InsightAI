@@ -37,7 +37,11 @@ async def get_current_user(
         
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
-        
+
+    # Attach user identity to Sentry error reports (no-op if Sentry disabled)
+    import sentry_sdk
+    sentry_sdk.set_user({"id": str(user.id), "email": user.email, "role": user.role})
+
     return user
 
 class RoleChecker:
