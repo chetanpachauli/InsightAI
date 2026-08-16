@@ -17,7 +17,12 @@ SELF_REGISTERABLE_ROLES = {"Employee", "MIS", "Manager"}
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 @limiter.limit(REGISTER_RATE_LIMIT)
-async def register(request: Request, user_in: UserCreate, db: AsyncSession = Depends(get_db)):
+async def register(
+    request: Request,
+    response: Response,
+    user_in: UserCreate,
+    db: AsyncSession = Depends(get_db)
+):
     """Create a new user in the system. Role is restricted to safe defaults."""
     # Prevent privilege escalation: nobody can self-register as Admin/CEO
     if user_in.role not in SELF_REGISTERABLE_ROLES:

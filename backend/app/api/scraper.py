@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.api.deps import get_current_user
@@ -51,6 +51,7 @@ def is_blocked_ssrf_target(url: str) -> bool:
 @limiter.limit(SCRAPER_RATE_LIMIT)
 async def extract_website_data(
     request: Request,
+    response: Response,
     req: ScrapeRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),

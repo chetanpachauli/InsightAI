@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, BackgroundTasks, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import text
@@ -33,6 +33,7 @@ async def run_etl_task(file_id: int):
 @limiter.limit(UPLOAD_RATE_LIMIT)
 async def upload_file(
     request: Request,
+    response: Response,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     current_user: User = Depends(RoleChecker(allowed_roles=["Admin", "MIS"])),

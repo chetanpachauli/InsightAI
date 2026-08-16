@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import text, func
@@ -29,6 +29,7 @@ class RawTableRequest(BaseModel):
 @limiter.limit(AI_RATE_LIMIT)
 async def chat_with_data(
     request: Request,
+    response: Response,
     query_in: ChatQueryRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -177,6 +178,7 @@ async def chat_with_data(
 @limiter.limit(GENERAL_RATE_LIMIT)
 async def get_raw_table_data(
     request: Request,
+    response: Response,
     req: RawTableRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -258,6 +260,7 @@ async def get_raw_table_data(
 @limiter.limit(AI_RATE_LIMIT)
 async def get_executive_insights(
     request: Request,
+    response: Response,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):

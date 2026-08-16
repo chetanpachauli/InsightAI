@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Request
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.core.database import get_db
@@ -50,6 +50,7 @@ def generate_embedding(text: str) -> List[float]:
 @limiter.limit(UPLOAD_RATE_LIMIT)
 async def upload_document(
     request: Request,
+    response: Response,
     file: UploadFile = File(...),
     current_user: User = Depends(RoleChecker(allowed_roles=["Admin", "MIS"])),
     db: AsyncSession = Depends(get_db)
@@ -124,6 +125,7 @@ async def upload_document(
 @limiter.limit(AI_RATE_LIMIT)
 async def query_knowledge_base(
     request: Request,
+    response: Response,
     query_in: DocQueryRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)

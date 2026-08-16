@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from app.core.database import get_db, SessionLocal
@@ -26,6 +26,7 @@ class ReclassifyRequest(BaseModel):
 @limiter.limit(UPLOAD_RATE_LIMIT)
 async def upload_bank_statement(
     request: Request,
+    response: Response,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
