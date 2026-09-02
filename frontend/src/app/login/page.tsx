@@ -45,10 +45,11 @@ export default function LoginPage() {
           { withCredentials: true } // Handles cookie storage
         );
         
-        // Save items to local storage
+        // Save items to local storage & cookie
         localStorage.setItem("access_token", response.data.access_token);
         localStorage.setItem("user_email", response.data.email);
         localStorage.setItem("user_role", response.data.role);
+        document.cookie = `access_token=${response.data.access_token}; path=/; max-age=86400; SameSite=Lax`;
         window.dispatchEvent(new Event("insightai-storage"));
 
         // Redirect to main workspace

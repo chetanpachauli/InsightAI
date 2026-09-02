@@ -16,19 +16,22 @@ const PROTECTED_PREFIXES = [
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasRefresh = Boolean(request.cookies.get("refresh_token")?.value);
+  const hasToken = Boolean(
+    request.cookies.get("access_token")?.value ||
+      request.cookies.get("refresh_token")?.value
+  );
   const isProtected = PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 
-  if (isProtected && !hasRefresh) {
+  if (isProtected && !hasToken) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (pathname === "/login" && hasRefresh) {
+  if (pathname === "/login" && hasToken) {
     const dashUrl = request.nextUrl.clone();
     dashUrl.pathname = "/dashboard";
     return NextResponse.redirect(dashUrl);
