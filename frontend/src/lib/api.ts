@@ -68,8 +68,9 @@ api.interceptors.response.use(
 
 export function getApiError(err: unknown, fallback: string): string {
   if (err && typeof err === "object" && "response" in err) {
-    const detail = (err as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
-    if (typeof detail === "string" && detail) return detail;
+    const resData = (err as { response?: { data?: { message?: unknown; detail?: unknown } } }).response?.data;
+    if (typeof resData?.message === "string" && resData.message) return resData.message;
+    if (typeof resData?.detail === "string" && resData.detail) return resData.detail;
   }
   if (err instanceof Error && err.message) return err.message;
   return fallback;
