@@ -19,11 +19,16 @@ from datetime import datetime
 
 router = APIRouter(prefix="/query", tags=["AI Analytics & Querying"])
 
+from app.services.query_validator import SQLSecurityValidator
+
 class ChatQueryRequest(BaseModel):
     question: str
+    history: Optional[List[Dict[str, Any]]] = None
 
 class RawTableRequest(BaseModel):
     table_name: str
+
+from app.services.billing_service import BillingService
 
 @router.post("/chat")
 @limiter.limit(AI_RATE_LIMIT)
@@ -36,11 +41,21 @@ async def chat_with_data(
 ):
     """
     Natural Language Chat with Database:
-    1. Retrieve all COMPLETED and APPROVED files.
-    2. Extract their table schemas from lineage data.
-    3. Ask Gemini to write a SQL query.
-    4. Execute SQL query and return results with chart suggestions.
+    1. Check organization subscription quota.
+    2. Retrieve all COMPLETED and APPROVED files.
+    3. Ask Gemini to write a safe SQL query with conversational context.
+    4. Validate using SQLSecurityValidator.
+    5. Execute SQL query, record usage, and return results.
     """
+    # 0. Enforce Subscription Quota
+    allowed, plan_label, used, limit, is_trial = await BillingService.check_query_quota(
+        db, current_user.organization_id
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Monthly AI query limit reached ({used}/{limit} queries). Please upgrade your organization plan to Pro or Enterprise to continue."
+        )
     # 1. Fetch approved and completed uploaded files
     result = await db.execute(
         select(UploadedFile)
@@ -55,18 +70,19 @@ async def chat_with_data(
             detail="No files have been approved yet. Please upload files and get Manager/CEO approval first."
         )
 
-    # 2. Build Schema Description for Gemini context
+    # 2. Build Schema Description & Sample Data for Gemini context
     schema_descriptions = []
+    approved_table_names = set()
     for file in approved_files:
         lineage = file.lineage_info or {}
         table_name = lineage.get("db_table")
         columns = lineage.get("columns_mapped", [])
         
-        # Fallback for older records where ETL lineage wasn't persisted:
-        # derive the dynamic table name from the filename + version convention.
         if not table_name:
             clean_slug = re.sub(r"[^a-z0-9]", "_", file.filename.lower().split(".")[0])
             table_name = f"data_{clean_slug}_v{file.version}"
+        
+        approved_table_names.add(table_name)
         
         if not columns:
             try:
@@ -82,14 +98,25 @@ async def chat_with_data(
             except Exception:
                 columns = []
             
-        col_desc = []
-        for col in columns:
-            col_desc.append(f"{col['cleaned']} ({col['type']})")
+        col_desc = [f"{col['cleaned']} ({col['type']})" for col in columns]
+
+        # Fetch up to 3 sample rows for semantic accuracy
+        sample_rows_str = ""
+        try:
+            samples_res = await db.execute(text(f'SELECT * FROM "{table_name}" LIMIT 3'))
+            sample_dicts = [
+                {k: v for k, v in dict(r).items() if not k.startswith("_")}
+                for r in samples_res.mappings()
+            ]
+            if sample_dicts:
+                sample_rows_str = f"\nSample Data (First 3 rows):\n{json.dumps(sample_dicts, default=str)}"
+        except Exception:
+            sample_rows_str = ""
             
         schema_descriptions.append(
             f"Table Name: {table_name}\n"
-            f"Description: Contains data uploaded from original file '{file.filename}' (Version {file.version})\n"
-            f"Columns: {', '.join(col_desc)}"
+            f"Source File: {file.filename} (v{file.version})\n"
+            f"Columns: {', '.join(col_desc)}{sample_rows_str}"
         )
         
     full_schema_context = "\n\n".join(schema_descriptions)
@@ -103,40 +130,27 @@ async def chat_with_data(
 
     ai_response = gemini_service.generate_sql_from_nl(
         user_question=query_in.question,
-        schema_description=full_schema_context
+        schema_description=full_schema_context,
+        conversation_history=query_in.history
     )
 
     sql_query = ai_response.sql_query
     explanation = ai_response.explanation
 
-    # 4. Execute the generated SQL query in PostgreSQL
-    # Basic SQL injection check: ensure it starts with SELECT and doesn't contain destructive keywords
-    query_upper = sql_query.upper().strip()
-    if not query_upper.startswith("SELECT"):
-         raise HTTPException(
-             status_code=status.HTTP_400_BAD_REQUEST,
-             detail="For security, only SELECT query executions are permitted."
-         )
+    # 4. Strict Security Validation
+    is_valid, sanitized_sql, error_msg = SQLSecurityValidator.validate_and_sanitize(
+        sql_query,
+        approved_tables=approved_table_names,
+        default_limit=1000
+    )
 
-    # Reject statement chaining: a single read-only SELECT should never contain ';'
-    sql_query = sql_query.strip()
-    if sql_query.endswith(";"):
-        sql_query = sql_query[:-1].strip()
-    if ";" in sql_query:
+    if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Security alert: multi-statement SQL is not permitted."
+            detail=f"Security alert: {error_msg}"
         )
-    query_upper = sql_query.upper()
-         
-    destructive_keywords = ["DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "TRUNCATE", "CREATE"]
-    for keyword in destructive_keywords:
-        # Check for whole word match to avoid false positives
-        if re.search(r'\b' + keyword + r'\b', query_upper):
-             raise HTTPException(
-                 status_code=status.HTTP_400_BAD_REQUEST,
-                 detail=f"Security alert: Blocked execution of query containing '{keyword}' keyword."
-             )
+
+    sql_query = sanitized_sql
 
     try:
         query_result = await db.execute(text(sql_query))
@@ -154,6 +168,7 @@ async def chat_with_data(
         )
         db.add(audit)
         await db.commit()
+        await BillingService.record_query_usage(db, current_user.organization_id)
         
         return {
             "question": query_in.question,

@@ -25,6 +25,10 @@ class UploadedFile(Base):
     
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    # Multi-tenancy
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+
     # Relationships
     owner = relationship("User", foreign_keys=[owner_id])
     approver = relationship("User", foreign_keys=[approved_by_id])
+    organization = relationship("Organization", foreign_keys=[organization_id])

@@ -14,7 +14,10 @@ import {
   BookOpen,
   Send,
   DollarSign,
-  Globe 
+  Globe,
+  BarChart3,
+  Mic,
+  CreditCard
 } from "lucide-react";
 import api, { useLocalStorage } from "@/lib/api";
 
@@ -23,16 +26,18 @@ export default function Sidebar() {
   const router = useRouter();
 
   const menuItems = [
-    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-    { name: "Uploads", path: "/uploads", icon: UploadCloud },
-    { name: "AI Analytics Chat", path: "/chat", icon: MessageSquareCode },
-    { name: "Rules Engine", path: "/rules", icon: Sliders },
-    { name: "Pivot Builder", path: "/pivot", icon: Grid3X3 },
-    { name: "Document Hub", path: "/documents", icon: BookOpen },
-    { name: "Notification Hub", path: "/notifications", icon: Send },
-    { name: "Finance AI", path: "/finance", icon: DollarSign },
-    { name: "Web Scraper", path: "/scraper", icon: Globe },
-    { name: "🎙️ Voice Assistant", path: "/voice", icon: MessageSquareCode },
+    { name: "Dashboard",          path: "/dashboard",        icon: LayoutDashboard },
+    { name: "Uploads",            path: "/uploads",          icon: UploadCloud },
+    { name: "AI Analytics Chat",  path: "/chat",             icon: MessageSquareCode },
+    { name: "Forecast",           path: "/forecast",         icon: BarChart3 },
+    { name: "Rules Engine",       path: "/rules",            icon: Sliders },
+    { name: "Pivot Builder",      path: "/pivot",            icon: Grid3X3 },
+    { name: "Document Hub",       path: "/documents",        icon: BookOpen },
+    { name: "Notifications",      path: "/notifications",    icon: Send },
+    { name: "Finance AI",         path: "/finance",          icon: DollarSign },
+    { name: "Web Scraper",        path: "/scraper",          icon: Globe },
+    { name: "Voice Assistant",    path: "/voice",            icon: Mic },
+    { name: "Billing & 2FA",      path: "/settings/billing", icon: CreditCard },
   ];
 
   const handleLogout = async () => {

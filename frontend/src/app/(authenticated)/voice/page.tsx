@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import api from "@/lib/api";
 import { 
   Mic, 
   MicOff, 
@@ -323,6 +324,15 @@ export default function VoiceAssistantPage() {
         ? "आपका स्वागत है!"
         : "You're welcome!";
     }
+    // Business MIS & Data Query
+    else if (/(sales|revenue|profit|loss|product|customer|region|expense|bikri|kamai|kharcha|data|report|budget|highest|top|trend|summary|बिक्री|कमाई|खर्च)/i.test(command)) {
+      responseText = language === 'hindi'
+        ? "डेटाबेस चेक करके इनसाइट्स ला रहा हूं..."
+        : "Analyzing business data...";
+      speak(responseText);
+      handleDataQuery(command);
+      return;
+    }
     // Unknown command
     else {
       // Check if it's a request to open something
@@ -355,6 +365,21 @@ export default function VoiceAssistantPage() {
     
     const now = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     setLogs(prev => [{user: command, assistant: responseText, time: now}, ...prev.slice(0, 9)]);
+  };
+
+  const handleDataQuery = async (queryText: string) => {
+    try {
+      const res = await api.post("/query/chat", { question: queryText });
+      const insight = res.data.explanation || "डेटा प्रोसेस हो गया है।";
+      speak(insight);
+      const now = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+      setLogs(prev => [{ user: queryText, assistant: insight, time: now }, ...prev.slice(0, 9)]);
+    } catch {
+      const errText = language === 'hindi'
+        ? "माफी चाहता हूं, डेटाबेस से जानकारी लाने में समस्या आई। कृपया सुनिश्चित करें कि डेटा अप्रूव्ड है।"
+        : "Could not retrieve insights from the database. Please ensure files are approved.";
+      speak(errText);
+    }
   };
 
   const fetchWeather = async () => {

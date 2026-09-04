@@ -33,6 +33,7 @@ from app.models.files import UploadedFile
 from app.models.rules import AlertRule
 from app.models.audit_logs import AuditLog
 from app.models.documents import DocumentChunk
+from app.models.organizations import Organization, TenantUsage, Subscription
 
 # Import API Routers
 from app.api.auth import router as auth_router
@@ -43,6 +44,8 @@ from app.api.documents import router as documents_router
 from app.api.notifications import router as notifications_router
 from app.api.finance import router as finance_router
 from app.api.scraper import router as scraper_router
+from app.api.analytics import router as analytics_router
+from app.api.billing import router as billing_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -51,6 +54,36 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables initialized successfully.")
+
+        # Seed Default Organization for backward compatibility
+        from sqlalchemy.future import select
+        from app.core.database import SessionLocal
+        async with SessionLocal() as session:
+            res = await session.execute(select(Organization).where(Organization.slug == "default"))
+            default_org = res.scalars().first()
+            if not default_org:
+                default_org = Organization(
+                    name="Default Enterprise",
+                    slug="default",
+                    plan_tier="PRO"
+                )
+                session.add(default_org)
+                await session.commit()
+                await session.refresh(default_org)
+
+            # Link existing users with no organization to default organization
+            from sqlalchemy import update
+            await session.execute(
+                update(User)
+                .where(User.organization_id.is_(None))
+                .values(organization_id=default_org.id)
+            )
+            await session.execute(
+                update(UploadedFile)
+                .where(UploadedFile.organization_id.is_(None))
+                .values(organization_id=default_org.id)
+            )
+            await session.commit()
     except Exception as e:
         logger.warning(f"Database table initialization warning: {e}")
     yield
@@ -92,6 +125,8 @@ app.include_router(documents_router, prefix=settings.API_V1_STR)
 app.include_router(notifications_router, prefix=settings.API_V1_STR)
 app.include_router(finance_router, prefix=settings.API_V1_STR)
 app.include_router(scraper_router, prefix=settings.API_V1_STR)
+app.include_router(analytics_router, prefix=settings.API_V1_STR)
+app.include_router(billing_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def read_root():

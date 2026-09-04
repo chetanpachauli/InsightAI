@@ -34,58 +34,77 @@ class GeminiService:
     def is_configured(self) -> bool:
         return self.client is not None
 
-    def generate_sql_from_nl(self, user_question: str, schema_description: str) -> SQLQueryResponse:
+    def generate_sql_from_nl(
+        self,
+        user_question: str,
+        schema_description: str,
+        conversation_history: Optional[list[dict]] = None
+    ) -> SQLQueryResponse:
         """
-        Convert a user's natural language question into a PostgreSQL SQL query
-        based on the provided database table schemas.
+        Convert a user's natural language question (Hindi, Hinglish, or English) into
+        a VALID and SAFE PostgreSQL SQL query based on database schemas.
         """
         if not self.is_configured():
             # Return a fallback dry run mock response if Gemini is not configured yet
             return SQLQueryResponse(
-                sql_query="SELECT region, SUM(amount) FROM sales_data GROUP BY region;",
+                sql_query="SELECT region, SUM(amount) AS total_sales FROM sales_data GROUP BY region;",
                 explanation="Gemini API Key is not configured. Showing mock SQL query.",
                 chart_type="bar",
                 x_axis_column="region",
-                y_axis_column="SUM(amount)"
+                y_axis_column="total_sales"
             )
+
+        history_context = ""
+        if conversation_history:
+            history_lines = []
+            for msg in conversation_history[-6:]:  # Keep last 6 exchanges for context
+                role = "User" if msg.get("sender") == "user" else "Assistant"
+                history_lines.append(f"{role}: {msg.get('text', '')}")
+            history_context = "\nRecent Conversation History:\n" + "\n".join(history_lines) + "\n"
 
         prompt = f"""
-        You are a senior data analyst and expert SQL writer.
-        Given the following PostgreSQL database table schemas:
+        You are a bilingual senior data analyst and expert SQL architect for an enterprise MIS platform.
+        You understand queries in Hindi (हिंदी), Hinglish (e.g. 'Last month me highest sales ka product dikhao'), and English.
+
+        Database Schemas & Sample Information:
         {schema_description}
+        {history_context}
+        User's Current Question: "{user_question}"
 
-        Convert the user's natural language question into a VALID and SAFE PostgreSQL read-only SQL query.
-        User question: "{user_question}"
-
-        Guidelines:
-        1. Only generate read-only SELECT queries. Never write INSERT, UPDATE, DELETE, or DROP.
-        2. Ensure column names and table names match the schemas exactly.
-        3. MULTI-TABLE RELATIONSHIPS: If the user's question involves columns, indicators, or metrics spread across multiple different tables, identify key columns that link them (such as common names, email links, codes, or transactional tags) and output the SQL query using INNER JOIN or LEFT JOIN. Always prefix column names with their respective table name (e.g. table_name.column_name) to avoid ambiguous column reference errors in PostgreSQL.
-        4. Determine if the data can be visualized using a chart. If yes, specify the chart type ('bar', 'line', 'pie') and identify which columns to map to the X and Y axes.
-        5. If it's a simple single-value response or table-only report, set chart_type to 'table' or 'none'.
+        Task:
+        1. Translate the user's intent into a VALID, SAFE, and READ-ONLY PostgreSQL SELECT query.
+        2. Write the explanation in the SAME language/dialect the user asked in:
+           - If asked in Hindi, explain in natural Hindi (e.g. 'दिसंबर 2025 में कुल बिक्री ₹45,23,890 रही...')
+           - If asked in Hinglish, explain in friendly Hinglish (e.g. 'Last month total sales ₹45,23,890 thi...')
+           - If asked in English, explain in professional English.
+        3. MULTI-TABLE JOINS: If the question spans across multiple uploaded datasets (e.g., sales joined with customer_info or products), identify matching foreign key columns and use INNER JOIN or LEFT JOIN with table prefixes (table.column).
+        4. Select an optimal chart type ('bar', 'line', 'pie', 'table', or 'none') and assign appropriate x_axis_column and y_axis_column aliases.
+        5. CRITICAL: Output strictly read-only SELECT statements. Never output INSERT, UPDATE, DELETE, DROP, or ALTER.
         """
 
-        try:
-            response = self.client.models.generate_content(
-                model='gemini-3.5-flash',
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=SQLQueryResponse,
-                    temperature=0.1 # Low temperature for strict SQL syntax correctness
-                ),
-            )
-            # Response text will be automatically validated and parsed against SQLQueryResponse Pydantic schema
-            import json
-            data = json.loads(response.text)
-            return SQLQueryResponse(**data)
-        except Exception as e:
-            # Return error explanation fallback
-            return SQLQueryResponse(
-                sql_query="SELECT * FROM uploaded_files LIMIT 5;",
-                explanation=f"Error running Gemini API: {str(e)}",
-                chart_type="none"
-            )
+        for model_name in ['gemini-2.0-flash', 'gemini-1.5-flash']:
+            try:
+                response = self.client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=SQLQueryResponse,
+                        temperature=0.1
+                    ),
+                )
+                import json
+                data = json.loads(response.text)
+                return SQLQueryResponse(**data)
+            except Exception:
+                continue
+
+        # Fallback if both model calls fail
+        return SQLQueryResponse(
+            sql_query="SELECT * FROM uploaded_files LIMIT 5;",
+            explanation="Unable to process AI query at this moment. Please verify table connections.",
+            chart_type="none"
+        )
 
     def generate_insights(self, data_summary_json: str) -> InsightRecommendationResponse:
         """
