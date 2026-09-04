@@ -37,8 +37,15 @@ class Settings(BaseSettings):
     # TTL (seconds) for cached expensive responses (AI insights, etc.)
     CACHE_TTL_INSIGHTS: int = 300
     
-    # AI API Keys
+    # AI API Keys (Multi-Key Failover & Load Balancing)
     GEMINI_API_KEY: Optional[str] = None
+    GEMINI_BACKUP_KEY: Optional[str] = None
+    GROQ_API_KEY: Optional[str] = None
+    OPENROUTER_API_KEY: Optional[str] = None
+
+    # Razorpay Payment Gateway
+    RAZORPAY_KEY_ID: str = "rzp_test_T3JEIRsMhJ8DYr"
+    RAZORPAY_KEY_SECRET: str = "irApl0AyFVf3MslurCTzWxBU"
 
     # Error Monitoring (Sentry). Leave empty to disable.
     SENTRY_DSN: Optional[str] = None

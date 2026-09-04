@@ -6,6 +6,7 @@ import hmac
 import hashlib
 import secrets
 
+from app.core.config import settings
 from app.models.organizations import Organization, TenantUsage, Subscription
 
 FREE_TIER_QUERY_LIMIT = 50
@@ -119,7 +120,7 @@ class BillingService:
             "currency": "INR",
             "plan": plan.upper(),
             "organization_id": organization_id,
-            "key_id": "rzp_live_insightai_public"
+            "key_id": getattr(settings, "RAZORPAY_KEY_ID", "rzp_test_T3JEIRsMhJ8DYr")
         }
 
     @staticmethod
@@ -127,8 +128,9 @@ class BillingService:
         order_id: str,
         payment_id: str,
         signature: str,
-        secret: str = "insightai_mock_secret_for_tests"
+        secret: Optional[str] = None
     ) -> bool:
+        active_secret = secret or getattr(settings, "RAZORPAY_KEY_SECRET", "irApl0AyFVf3MslurCTzWxBU")
         message = f"{order_id}|{payment_id}".encode("utf-8")
-        generated_sig = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
+        generated_sig = hmac.new(active_secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
         return hmac.compare_digest(generated_sig, signature) or signature.startswith("sig_valid_")
