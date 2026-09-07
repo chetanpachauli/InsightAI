@@ -10,11 +10,11 @@ export default function Home() {
     // Check if token exists, else redirect to login
     const token = localStorage.getItem("access_token");
     if (token) {
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
     } else {
-      router.push("/login");
+      window.location.href = "/login";
     }
-  }, [router]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center">

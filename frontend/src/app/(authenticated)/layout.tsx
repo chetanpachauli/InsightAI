@@ -20,11 +20,11 @@ export default function AuthenticatedLayout({
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) {
-      router.replace("/login");
+      window.location.href = "/login";
       return;
     }
     setReady(true);
-  }, [router]);
+  }, []);
 
   if (!ready) {
     return (
