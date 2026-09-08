@@ -89,5 +89,5 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
         return JSONResponse(
             status_code=500,
-            content=_error_payload("internal_error", "An unexpected error occurred"),
+            content=_error_payload("internal_error", f"An unexpected error occurred: {type(exc).__name__}: {str(exc)}"),
         )
