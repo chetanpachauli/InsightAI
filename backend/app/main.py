@@ -49,11 +49,28 @@ from app.api.billing import router as billing_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Ensure all tables exist in database on startup
+    # Ensure all tables exist in database on startup & apply missing column migrations
     try:
+        from sqlalchemy import text
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database tables initialized successfully.")
+            # Safely add missing columns to pre-existing PostgreSQL tables
+            migrations = [
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_id INTEGER;",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE;",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR(64);",
+                "ALTER TABLE uploaded_files ADD COLUMN IF NOT EXISTS organization_id INTEGER;",
+                "ALTER TABLE uploaded_files ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'Approved';",
+                "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS organization_id INTEGER;",
+                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS organization_id INTEGER;",
+                "ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS organization_id INTEGER;",
+            ]
+            for stmt in migrations:
+                try:
+                    await conn.execute(text(stmt))
+                except Exception as mig_err:
+                    logger.warning(f"Migration stmt warning: {mig_err}")
+        logger.info("Database tables and columns initialized successfully.")
 
         # Seed Default Organization for backward compatibility
         from sqlalchemy.future import select
