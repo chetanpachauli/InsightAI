@@ -26,20 +26,29 @@ class TestRegister:
         assert resp.status_code == 400
         assert "already exists" in resp.json()["message"]
 
-    def test_register_rejects_admin_role(self, client):
+    def test_register_allows_admin_role(self, client):
         resp = client.post(
             "/api/v1/auth/register",
-            json={"email": "hacker@test.com", "password": "Secure@123", "role": "Admin"},
+            json={"email": "newadmin@test.com", "password": "Secure@123", "role": "Admin"},
+        )
+        assert resp.status_code == 201
+        assert resp.json()["role"] == "Admin"
+
+    def test_register_allows_ceo_role(self, client):
+        resp = client.post(
+            "/api/v1/auth/register",
+            json={"email": "newceo@test.com", "password": "Secure@123", "role": "CEO"},
+        )
+        assert resp.status_code == 201
+        assert resp.json()["role"] == "CEO"
+
+    def test_register_rejects_unknown_role(self, client):
+        resp = client.post(
+            "/api/v1/auth/register",
+            json={"email": "hacker@test.com", "password": "Secure@123", "role": "SuperUser"},
         )
         assert resp.status_code == 400
         assert "not allowed" in resp.json()["message"]
-
-    def test_register_rejects_ceo_role(self, client):
-        resp = client.post(
-            "/api/v1/auth/register",
-            json={"email": "ceo@test.com", "password": "Secure@123", "role": "CEO"},
-        )
-        assert resp.status_code == 400
 
     def test_register_invalid_email(self, client):
         resp = client.post(
