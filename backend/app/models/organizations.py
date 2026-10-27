@@ -12,11 +12,11 @@ class Organization(Base):
     plan_tier = Column(String(20), default="FREE", nullable=False) # FREE, PRO, ENTERPRISE
     trial_ends_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc) + timedelta(days=14),
+        default=lambda: datetime.utcnow() + timedelta(days=14),
         nullable=True
     )
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationships
     users = relationship("User", back_populates="organization", foreign_keys="User.organization_id")
@@ -31,7 +31,7 @@ class TenantUsage(Base):
     month_year = Column(String(7), nullable=False, index=True) # e.g. "2026-09"
     ai_queries_used = Column(Integer, default=0, nullable=False)
     file_uploads_count = Column(Integer, default=0, nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     organization = relationship("Organization", back_populates="usage_records")
 
@@ -46,7 +46,7 @@ class Subscription(Base):
     amount = Column(Float, nullable=False)
     currency = Column(String(5), default="INR", nullable=False)
     status = Column(String(20), default="ACTIVE", nullable=False) # ACTIVE, EXPIRED, CANCELLED
-    starts_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    starts_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     expires_at = Column(DateTime, nullable=False)
 
     organization = relationship("Organization", back_populates="subscriptions")

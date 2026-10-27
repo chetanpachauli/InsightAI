@@ -11,7 +11,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="Employee", nullable=False) # Admin, CEO, Manager, MIS, Employee
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Multi-Tenancy & Security
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
