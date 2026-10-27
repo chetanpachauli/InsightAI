@@ -254,11 +254,11 @@ export default function LoginPage() {
                       <option value="Manager" className="bg-slate-900 text-slate-100 py-2">
                         Manager (Review Reports & Rules)
                       </option>
-                      <option value="CEO" disabled className="bg-slate-950 text-slate-500 py-2">
-                        CEO (Approve Final Data) - Contact Admin
+                      <option value="CEO" className="bg-slate-900 text-slate-100 py-2">
+                        CEO (Approve Final Data)
                       </option>
-                      <option value="Admin" disabled className="bg-slate-950 text-slate-500 py-2">
-                        Admin (Full Control) - Contact Admin
+                      <option value="Admin" className="bg-slate-900 text-slate-100 py-2">
+                        Admin (Full Control)
                       </option>
                     </select>
                     <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 pointer-events-none">

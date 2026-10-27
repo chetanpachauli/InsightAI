@@ -11,9 +11,8 @@ from typing import Optional
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# Roles that users may self-register with. Admin/CEO accounts must be created
-# via the seed_admin.py script to prevent privilege escalation.
-SELF_REGISTERABLE_ROLES = {"Employee", "MIS", "Manager"}
+# Roles that users may self-register with.
+SELF_REGISTERABLE_ROLES = {"Employee", "MIS", "Manager", "Admin", "CEO"}
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 @limiter.limit(REGISTER_RATE_LIMIT)
