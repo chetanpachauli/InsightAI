@@ -3,7 +3,7 @@
 set -e
 
 echo "[entrypoint] Running database migrations..."
-alembic upgrade head
+alembic upgrade head || echo "[entrypoint] WARNING: Alembic migration failed (database may be unreachable or sleeping). Starting server anyway..."
 
 echo "[entrypoint] Starting uvicorn..."
 # Bind to $PORT when provided (Render injects PORT=10000), default 8000 for local Docker
